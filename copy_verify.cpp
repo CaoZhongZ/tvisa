@@ -5,7 +5,7 @@
 #include "sycl_misc.hpp"
 #include "gen_visa_templates.hpp"
 
-#define SG_SZ 32
+#define SG_SZ 16
 
 #define xstr(s) str(s)
 #define str(x) #x
@@ -34,6 +34,43 @@ void fill_sequential(uint64_t *p, int rank, size_t nelems) {
     p[i] = i + rank;
   }
 }
+
+union merge {
+  uint64_t whole;
+  sycl::vec<uint32_t, 2> split;
+};
+
+struct linear_copy {
+  linear_copy(sycl::vec<uint32_t, 2>* dst, uint64_t* src)
+    : src(src), dst(dst) {}
+
+  void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> index) const {
+#if defined(__SYCL_DEVICE_ONLY__)
+    merge tmp;
+
+    lscLoad<SG_SZ>(tmp.whole, (void *)(src + index));
+    lscStore<SG_SZ>((void *)(dst + index), tmp.split);
+#else
+    merge tmp;
+    tmp.whole = src[index];
+    dst[index] = tmp.split;
+#endif
+  }
+
+  // shuffle expected
+  static void verify(uint32_t* dst, uint32_t *host, size_t nelems) {
+    auto shuffle = reinterpret_cast<uint32_t (*)[2][SG_SZ]>(host);
+
+    for (int i = 0; i < nelems; ++ i) {
+      if (shuffle[i /(SG_SZ * 2)][i % 2][i / 2] != dst[i])
+        std::cout<<"Verify failed @"<<i<<std::endl;
+    }
+  }
+
+private:
+  uint64_t* src;
+  sycl::vec<uint32_t, 2>* dst;
+};
 
 int main(int argc, char *argv[]) {
   cxxopts::Options opts("Copy", "Copy baseline for performance");
@@ -65,42 +102,15 @@ int main(int argc, char *argv[]) {
 
   fill_sequential((uint64_t *)b_host, 1, nelems);
 
-  union merge {
-    uint64_t whole;
-    sycl::vec<uint32_t, 2> split;
-  };
-
   queue.memcpy(src, b_host, alloc_size);
   queue.wait();
 
-  struct asm_copy {
-    uint64_t* src;
-    sycl::vec<uint32_t, 2>* dst;
-
-    asm_copy(sycl::vec<uint32_t, 2>* dst, uint64_t* src) : src(src), dst(dst) {}
-
-    void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> i) const {
-#if defined(__SYCL_DEVICE_ONLY__)
-      merge tmp;
-
-      asm volatile("\n"
-          "lsc_load.ugm (M1, " xstr(SG_SZ) ") %0:d64 flat[%2]:a64\n"
-          "lsc_store.ugm (M1, " xstr(SG_SZ) ") flat[%1]:a64 %3:d32x2\n"
-          :"=rw"(tmp.whole)
-          : "rw"(dst + i), "rw"(src + i),
-          "rw"(static_cast<sycl::vec<uint32_t, 2>::vector_t>(tmp.split)));
-#else
-      merge tmp;
-      tmp.whole = src[i];
-      dst[i] = tmp.split;
-#endif
-    }
-  };
-
   queue.submit([&](sycl::handler &h) {
-    h.parallel_for(sycl::range<1> {nelems}, asm_copy(dst, src));
+    h.parallel_for(sycl::range<1> {nelems}, linear_copy(dst, src));
   });
 
   queue.memcpy(b_check, dst, alloc_size);
   queue.wait();
+
+  linear_copy::verify((uint32_t *)b_check, (uint32_t *)b_host, alloc_size);
 }
