@@ -7,6 +7,9 @@
 
 #define SG_SZ 32
 
+#define xstr(s) str(s)
+#define str(x) #x
+
 size_t parse_nelems(const std::string& nelems_string) {
   size_t base = 1;
   size_t pos = nelems_string.rfind("K");
@@ -76,14 +79,16 @@ int main(int argc, char *argv[]) {
 
     asm_copy(sycl::vec<uint32_t, 2>* dst, uint64_t* src) : src(src), dst(dst) {}
 
-    void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> index) const {
+    void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> i) const {
 #if defined(__SYCL_DEVICE_ONLY__)
       merge tmp;
 
       asm volatile("\n"
-          "lsc_load.ugm (M1, " #SG_SZ ") %0:d64 flat[%2]:a64\n"
-          "lsc_store.ugm (M1, " #SG_SZ ") flat[%1]:a64 %3:d32x2\n"
-          :"=rw"(tmp.whole) : "rw"(dst + i), "rw"(src + i), "rw"(tmp.split.vector_t());
+          "lsc_load.ugm (M1, " xstr(SG_SZ) ") %0:d64 flat[%2]:a64\n"
+          "lsc_store.ugm (M1, " xstr(SG_SZ) ") flat[%1]:a64 %3:d32x2\n"
+          :"=rw"(tmp.whole)
+          : "rw"(dst + i), "rw"(src + i),
+          "rw"(static_cast<sycl::vec<uint32_t, 2>::vector_t>(tmp.split)));
 #else
       merge tmp;
       tmp.whole = src[i];
