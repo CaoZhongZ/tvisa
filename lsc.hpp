@@ -3,12 +3,15 @@
 #include <type_traits>
 #include <sycl/sycl.hpp>
 
+#define xstr(s) str(s)
+#define str(x) #x
+
 enum DataShuffle {
   none, transpose, vnni
 };
 
 enum CacheCtrl {
-  L1STATE_L3MOCS = 0,
+  DEFAULT = 0,
   L1UC_L3UC,
   L1C_L3UC,
   L1C_L3C,
@@ -17,31 +20,34 @@ enum CacheCtrl {
 
 namespace {
 
-template <int dataWidth, int vectorSize, int subGroupSize>
+template <int dataWidth, int vectorSize, int subGroupSize,
+         CacheCtrl = CacheCtrl::DEFAULT>
 struct LscLoad {
   template <typename T>  static inline void run(T& var, void* addr);
 };
 
-template <int dataWidth, int vectorSize, int subGroupSize>
+template <int dataWidth, int vectorSize, int subGroupSize,
+         CacheCtrl = CacheCtrl::DEFAULT>
 struct LscStore {
   template <typename T> static inline void run(void* addr, const T& var);
 };
 
 // instruction enumeration for all widths and subgroups
 
-template <> struct LscLoad<4, 1, 16> {
+template <> struct LscLoad<4, 1, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 16) %0:d32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
 #else
-    var = *reinterpret_cast<T *>(addr);
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
 #endif
   }
 };
 
-template <> struct LscLoad<4, 2, 16> {
+template <> struct LscLoad<4, 2, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile ("\n"
@@ -54,7 +60,7 @@ template <> struct LscLoad<4, 2, 16> {
   }
 };
 
-template <> struct LscLoad<4, 4, 16> {
+template <> struct LscLoad<4, 4, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile ("\n"
@@ -67,7 +73,7 @@ template <> struct LscLoad<4, 4, 16> {
   }
 };
 
-template <> struct LscLoad<4, 1, 32> {
+template <> struct LscLoad<4, 1, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile ("\n"
@@ -80,7 +86,7 @@ template <> struct LscLoad<4, 1, 32> {
   }
 };
 
-template <> struct LscLoad<4, 2, 32> {
+template <> struct LscLoad<4, 2, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile ("\n"
@@ -93,7 +99,7 @@ template <> struct LscLoad<4, 2, 32> {
   }
 };
 
-template <> struct LscLoad<4, 4, 32> {
+template <> struct LscLoad<4, 4, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile ("\n"
@@ -106,7 +112,7 @@ template <> struct LscLoad<4, 4, 32> {
   }
 };
 
-template <> struct LscLoad<8, 1, 16> {
+template <> struct LscLoad<8, 1, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile (
@@ -119,7 +125,7 @@ template <> struct LscLoad<8, 1, 16> {
   }
 };
 
-template <> struct LscStore<4, 1, 16> {
+template <> struct LscStore<4, 1, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile ("\n"
@@ -132,7 +138,7 @@ template <> struct LscStore<4, 1, 16> {
   }
 };
 
-template <> struct LscStore<4, 1, 32> {
+template <> struct LscStore<4, 1, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile ("\n"
@@ -145,7 +151,7 @@ template <> struct LscStore<4, 1, 32> {
   }
 };
 
-template <> struct LscStore<4, 2, 16> {
+template <> struct LscStore<4, 2, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile ("\n"
@@ -158,7 +164,7 @@ template <> struct LscStore<4, 2, 16> {
   }
 };
 
-template <> struct LscStore<4, 2, 32> {
+template <> struct LscStore<4, 2, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile ("\n"
@@ -171,7 +177,7 @@ template <> struct LscStore<4, 2, 32> {
   }
 };
 
-template <> struct LscStore<4, 4, 16> {
+template <> struct LscStore<4, 4, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile ("\n"
@@ -184,7 +190,7 @@ template <> struct LscStore<4, 4, 16> {
   }
 };
 
-template <> struct LscStore<4, 4, 32> {
+template <> struct LscStore<4, 4, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile ("\n"
@@ -197,7 +203,7 @@ template <> struct LscStore<4, 4, 32> {
   }
 };
 
-template <int Row, int Wdith, DataShuffle Transpose>
+template <int Row, int Wdith, DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
 struct Lsc2DLoad {
   template <typename T> static inline void run(
       T (&array)[Row], void* SurfaceBase,
@@ -206,7 +212,7 @@ struct Lsc2DLoad {
 };
 
 template <>
-struct Lsc2DLoad<8, 16, DataShuffle::none> {
+struct Lsc2DLoad<8, 16, DataShuffle::none, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(
     T (& array)[8], void* SurfaceBase,
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
@@ -226,34 +232,34 @@ struct Lsc2DLoad<8, 16, DataShuffle::none> {
 
 } // enumrate space
 
-template <int subGroupSize, typename T>
+template <int subGroupSize, CacheCtrl CTL= CacheCtrl::DEFAULT, typename T>
 static inline void lscLoad(T& var, void *addr) {
-  LscLoad<sizeof(T), 1, subGroupSize>::run(var, addr);
+  LscLoad<sizeof(T), 1, subGroupSize, CTL>::run(var, addr);
 }
 
-template <int subGroupSize, typename T>
+template <int subGroupSize, CacheCtrl CTL= CacheCtrl::DEFAULT, typename T>
 static inline void lscStore(void *addr, const T& var) {
-  LscStore<sizeof(T), 1, subGroupSize>::run(addr, var);
+  LscStore<sizeof(T), 1, subGroupSize, CTL>::run(addr, var);
 }
 
-template <int subGroupSize, typename T, int N>
+template <int subGroupSize, CacheCtrl CTL= CacheCtrl::DEFAULT, typename T, int N>
 static inline void lscLoad(T(& var)[N], void *addr) {
-  LscLoad<sizeof(T), N, subGroupSize>::run(var, addr);
+  LscLoad<sizeof(T), N, subGroupSize, CTL>::run(var, addr);
 }
 
-template <int subGroupSize, typename T, int N>
+template <int subGroupSize, CacheCtrl CTL= CacheCtrl::DEFAULT, typename T, int N>
 static inline void lscStore(void *addr, const T(& var)[N]) {
-  LscStore<sizeof(T), N, subGroupSize>::run(addr, var);
+  LscStore<sizeof(T), N, subGroupSize, CTL>::run(addr, var);
 }
 
-template <int subGroupSize, typename T, int N>
+template <int subGroupSize, CacheCtrl CTL= CacheCtrl::DEFAULT, typename T, int N>
 static inline void lscLoad(sycl::vec<T, N>& var, void *addr) {
-  LscLoad<sizeof(T), N, subGroupSize>::run(var, addr);
+  LscLoad<sizeof(T), N, subGroupSize, CTL>::run(var, addr);
 }
 
-template <int subGroupSize, typename T, int N>
+template <int subGroupSize, CacheCtrl CTL= CacheCtrl::DEFAULT, typename T, int N>
 static inline void lscStore(void* addr, const sycl::vec<T, N>& var) {
-  LscStore<sizeof(T), N, subGroupSize>::run(addr, var);
+  LscStore<sizeof(T), N, subGroupSize, CTL>::run(addr, var);
 }
 
 // Intended usage:
