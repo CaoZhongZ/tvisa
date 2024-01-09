@@ -7,9 +7,6 @@
 
 #define SG_SZ 16
 
-#define xstr(s) str(s)
-#define str(x) #x
-
 size_t parse_nelems(const std::string& nelems_string) {
   size_t base = 1;
   size_t pos = nelems_string.rfind("K");
@@ -29,67 +26,58 @@ size_t parse_nelems(const std::string& nelems_string) {
   return stoull(nelems_string) * base;
 }
 
-void fill_sequential(uint64_t *p, int rank, size_t nelems) {
+template <typename T>
+void fill_sequential(T *p, int rank, size_t nelems) {
   for (size_t i = 0; i < nelems; ++ i) {
     p[i] = i + rank;
   }
 }
 
-union merge {
-  uint64_t whole;
-  sycl::vec<uint32_t, 2> split;
-};
-
+template <typename T>
 struct linear_copy {
-  linear_copy(sycl::vec<uint32_t, 2>* dst, uint64_t* src)
-    : src(src), dst(dst) {}
+  linear_copy(T* dst, T* src)
+    : src(src),
+    dst(dst) {}
 
   void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> index) const {
 #if defined(__SYCL_DEVICE_ONLY__)
-    merge tmp;
+    T tmp, tmp2;
 
-    lscLoad<SG_SZ>(tmp.whole, (void *)(src + index));
-    lscStore<SG_SZ>((void *)(dst + index), tmp.split);
+    lscLoad<SG_SZ, CacheCtrl::L1UC_L3UC>(tmp, (void *)(src + index));
+    lscLoad<SG_SZ, CacheCtrl::L1UC_L3UC>(tmp2, (void *)(dst + index));
+    lscStore<SG_SZ, CacheCtrl::L1UC_L3UC>((void *)(dst + index), tmp + tmp2);
 #else
-    merge tmp;
-    tmp.whole = src[index];
-    dst[index] = tmp.split;
+    dst[i] += src[i];
 #endif
   }
 
   // shuffle expected
-  static void verify(uint32_t* dst, uint32_t *host, size_t nelems) {
-    auto shuffle = reinterpret_cast<uint32_t (*)[2][SG_SZ]>(host);
-
-    for (int i = 0; i < nelems; ++ i) {
-      if (shuffle[i /(SG_SZ * 2)][i % 2][i / 2] != dst[i])
-        std::cout<<"Verify failed @"<<i<<std::endl;
-    }
+  static void verify(void* dst, void *host, size_t sz) {
+    if (memcmp(dst, host, sz) != 0)
+        std::cout<<"Verify Failed"<<std::endl;
   }
 
 private:
-  uint64_t* src;
-  sycl::vec<uint32_t, 2>* dst;
+  T* src;
+  T* dst;
 };
 
 int main(int argc, char *argv[]) {
   cxxopts::Options opts("Copy", "Copy baseline for performance");
   opts.allow_unrecognised_options();
   opts.add_options()
-    ("n,nelems", "Number of elements", cxxopts::value<std::string>()->default_value("16MB"))
+    ("s,size", "Size of test buffer", cxxopts::value<std::string>()->default_value("32MB"))
     ;
 
   auto parsed_opts = opts.parse(argc, argv);
-  auto nelems_string = parsed_opts["nelems"].as<std::string>();
+  auto sz_string = parsed_opts["size"].as<std::string>();
 
-  auto nelems = parse_nelems(nelems_string);
-  using test_type = uint64_t;
-  size_t alloc_size = nelems * sizeof(test_type);
+  auto alloc_size = parse_nelems(sz_string);
 
   auto queue = currentQueue(0, 0);
 
-  auto* src = (test_type *)sycl::malloc_device(alloc_size, queue);
-  auto* dst = (sycl::vec<uint32_t, 2> *)sycl::malloc_device(alloc_size, queue);
+  auto* src = sycl::malloc_device(alloc_size, queue);
+  auto* dst = sycl::malloc_device(alloc_size, queue);
   auto* b_host = sycl::malloc_host(alloc_size, queue);
   auto* b_check = sycl::malloc_host(alloc_size, queue);
 
@@ -100,17 +88,83 @@ int main(int argc, char *argv[]) {
     sycl::free(b_check, queue);
   });
 
-  fill_sequential((uint64_t *)b_host, 1, nelems);
+  fill_sequential((uint32_t *)b_host, 1, alloc_size / sizeof(uint32_t));
 
   queue.memcpy(src, b_host, alloc_size);
   queue.wait();
 
+  //
+  // test 32-bit, 1, 2, 4 vector;
+  //
+  auto nelems = alloc_size / sizeof(uint32_t);
+
   queue.submit([&](sycl::handler &h) {
-    h.parallel_for(sycl::range<1> {nelems}, linear_copy(dst, src));
+    h.parallel_for(sycl::range<1> {nelems},
+        linear_copy(
+          reinterpret_cast<uint32_t *>(dst),
+          reinterpret_cast<uint32_t *>(src)));
   });
 
   queue.memcpy(b_check, dst, alloc_size);
   queue.wait();
 
-  linear_copy::verify((uint32_t *)b_check, (uint32_t *)b_host, alloc_size);
+  queue.memset(dst, 0, alloc_size);
+
+  queue.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::range<1> {nelems / 2},
+        linear_copy(
+          reinterpret_cast<sycl::vec<uint32_t, 2> *>(dst),
+          reinterpret_cast<sycl::vec<uint32_t, 2> *>(src)));
+  });
+
+  queue.memcpy(b_check, dst, alloc_size);
+  queue.wait();
+
+  queue.memset(dst, 0, alloc_size);
+
+  queue.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::range<1> {nelems / 4},
+        linear_copy(
+          reinterpret_cast<sycl::vec<uint32_t, 4> *>(dst),
+          reinterpret_cast<sycl::vec<uint32_t, 4> *>(src)));
+  });
+
+  queue.memcpy(b_check, dst, alloc_size);
+  queue.wait();
+
+  // -------------------------------------------------------------
+  nelems = alloc_size / sizeof(sycl::half);
+  queue.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::range<1> {nelems},
+        linear_copy(
+          reinterpret_cast<sycl::half *>(dst),
+          reinterpret_cast<sycl::half *>(src)));
+  });
+
+  queue.memcpy(b_check, dst, alloc_size);
+  queue.wait();
+
+  queue.memset(dst, 0, alloc_size);
+
+  queue.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::range<1> {nelems / 2},
+        linear_copy(
+          reinterpret_cast<sycl::vec<sycl::half, 2> *>(dst),
+          reinterpret_cast<sycl::vec<sycl::half, 2> *>(src)));
+  });
+
+  queue.memcpy(b_check, dst, alloc_size);
+  queue.wait();
+
+  queue.memset(dst, 0, alloc_size);
+
+  queue.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::range<1> {nelems / 8},
+        linear_copy(
+          reinterpret_cast<sycl::vec<sycl::half, 8> *>(dst),
+          reinterpret_cast<sycl::vec<sycl::half, 8> *>(src)));
+  });
+
+  queue.memcpy(b_check, dst, alloc_size);
+  queue.wait();
 }
