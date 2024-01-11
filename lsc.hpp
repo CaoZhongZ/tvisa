@@ -38,6 +38,123 @@ struct LscStore {
 //
 //
 // TODO: Add support for sycl::half and sycl::vec of sycl::half
+//
+template <> struct LscLoad<1, 1, 16, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 16) %0:d8u32 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<1, 2, 16, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 16) %0:d16u32 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<1, 4, 16, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 16) %0:d32 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<1, 8, 16, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 16) %0:d32x2 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<1, 16, 16, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 16) %0:d32x4 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<2, 1, 16, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 16) %0:d16u32 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<2, 2, 16, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 16) %0:d32 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<2, 4, 16, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 16) %0:d32x2 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<2, 8, 16, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 16) %0:d32x4 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
 
 template <> struct LscLoad<4, 1, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
@@ -71,6 +188,123 @@ template <> struct LscLoad<4, 4, 16, CacheCtrl::DEFAULT> {
     asm volatile ("\n"
         "lsc_load.ugm (M1, 16) %0:d32x4 flat[%1]:a64\n"
         : "=rw"(var) : "rw" (addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<1, 1, 32, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 32) %0:d8u32 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<1, 2, 32, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 32) %0:d16u32 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<1, 4, 32, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 32) %0:d32 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<1, 8, 32, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 32) %0:d32x2 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<1, 16, 32, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 32) %0:d32x4 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<2, 1, 32, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 32) %0:d16u32 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<2, 2, 32, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 32) %0:d32 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<2, 4, 32, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 32) %0:d32x2 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
+#else
+  static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <> struct LscLoad<2, 8, 32, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(T& var, void* addr) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+      "lsc_load.ugm (M1, 32) %0:d32x4 flat[%1]:a64\n"
+      : "=rw"(var) : "rw"(addr));
 #else
   static_assert(false,
       "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
