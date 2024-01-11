@@ -93,4 +93,4 @@ onepass : onepass.o
 	$(CXX) $(V) $(LINKFLAGS) -o $@ $<
 
 clean :
-	rm -f small main accessor *.o *.header.hpp *.footer.hpp *.bc onepass ./tmp/*
+	rm -f copy_verify small main accessor *.o *.header.hpp *.footer.hpp *.bc onepass ./tmp/*

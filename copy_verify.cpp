@@ -47,7 +47,7 @@ struct linear_copy {
     lscLoad<SG_SZ, CacheCtrl::L1UC_L3UC>(tmp2, (void *)(dst + index));
     lscStore<SG_SZ, CacheCtrl::L1UC_L3UC>((void *)(dst + index), tmp + tmp2);
 #else
-    dst[i] += src[i];
+    dst[index] += src[index];
 #endif
   }
 
