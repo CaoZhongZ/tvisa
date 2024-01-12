@@ -84,7 +84,8 @@ spirv_ext=-all,+SPV_EXT_shader_atomic_float_add,+SPV_EXT_shader_atomic_float_min
 copy_verify : copy_verify.o sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
-all : main small accessor
+dump : dump.o sycl_misc.o
+	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
 onepass.o : main.cpp
 	$(CXX) $(V) $(SYCLFLAGS) -c -o $@ $<
@@ -93,4 +94,4 @@ onepass : onepass.o
 	$(CXX) $(V) $(LINKFLAGS) -o $@ $<
 
 clean :
-	rm -f copy_verify small main accessor *.o *.header.hpp *.footer.hpp *.bc onepass ./tmp/*
+	rm -f copy_verify dump main accessor *.o *.header.hpp *.footer.hpp *.bc onepass ./tmp/*
