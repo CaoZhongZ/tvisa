@@ -926,11 +926,12 @@ template <> struct LscStore<4, 4, 32, CacheCtrl::L1UC_L3UC> {
 template <int Row, int Wdith, DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
 struct Lsc2DLoad {
   template <typename T> static inline void run(
-      T (&array)[Row], void* SurfaceBase,
+      T (& array)[Row], void* SurfaceBase,
       int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
       int Src0AddrX, int Src0Addr);
 };
 
+// Register 8x16 load
 template <>
 struct Lsc2DLoad<8, 16, DataShuffle::none, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(
@@ -960,6 +961,52 @@ struct Lsc2DLoad<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 #if defined(__SYCL_DEVICE_ONLY__)
     asm volatile ("\n"
         "lsc_load_block2d.ugm.uc.uc (M1_NM, 1) %0:d32.1x8x16nn flat[%1, %2, %3, %4, %5, %6]"
+        :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
+        "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
+#else
+    static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <int Row, int Wdith, DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
+struct Lsc2DStore {
+  template <typename T> static inline void run(
+      void* SurfaceBase, const T (&array)[Row],
+      int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
+      int Src0AddrX, int Src0Addr);
+};
+
+template <>
+struct Lsc2DStore<8, 16, DataShuffle::none, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(
+    void* SurfaceBase, T (& array)[8],
+    int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
+    int Src0AddrX, int Src0AddrY
+  ) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+        "lsc_store_block2d.ugm (M1_NM, 1) flat[%1, %2, %3, %4, %5, %6] %0:d32.1x8x16nn"
+        :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
+        "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
+#else
+    static_assert(false,
+      "Not supported on host, wrap your code with __SYCL_DEVICE_ONLY__");
+#endif
+  }
+};
+
+template <>
+struct Lsc2DStore<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
+  template <typename T> static inline void run(
+    void* SurfaceBase, T (& array)[8],
+    int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
+    int Src0AddrX, int Src0AddrY
+  ) {
+#if defined(__SYCL_DEVICE_ONLY__)
+    asm volatile ("\n"
+        "lsc_store_block2d.ugm.uc.uc (M1_NM, 1) flat[%1, %2, %3, %4, %5, %6] %0:d32.1x8x16nn"
         :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
@@ -1062,7 +1109,8 @@ static inline void lscStore(void* addr, const sycl::vec<T, N>& var) {
 }
 
 // Intended usage:
-//    lscLoad<16, DataShuffle::none>(array, adrs, 1024, 1024, 4096, 0, 128);
+//    lscLoad<16, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+//    array, adrs, 1024, 1024, 4096, 0, 0);
 
 template <int Width, DataShuffle Transpose, CacheCtrl CTL= CacheCtrl::DEFAULT,
          typename T, int Row>
@@ -1071,6 +1119,21 @@ static inline void lscLoad(T (&array) [Row], void* SurfaceBase,
     int Src0AddrX, int Src0AddrY) {
   Lsc2DLoad<Row, Width, Transpose, CTL>::template run<T>(
       array, SurfaceBase,
+      SurfaceWidth, SurfaceHeight, SurfacePitch,
+      Src0AddrX, Src0AddrY);
+}
+
+// Intended usage:
+//    lscStore<16, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+//    adrs, array, 1024, 1024, 4096, 0, 0);
+
+template <int Width, DataShuffle Transpose, CacheCtrl CTL= CacheCtrl::DEFAULT,
+         typename T, int Row>
+static inline void lscStore(void* SurfaceBase, T (&array) [Row],
+    int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
+    int Src0AddrX, int Src0AddrY) {
+  Lsc2DStore<Row, Width, Transpose, CTL>::template run<T>(
+      SurfaceBase, array,
       SurfaceWidth, SurfaceHeight, SurfacePitch,
       Src0AddrX, Src0AddrY);
 }
