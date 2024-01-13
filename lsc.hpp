@@ -923,6 +923,12 @@ template <> struct LscStore<4, 4, 32, CacheCtrl::L1UC_L3UC> {
   }
 };
 
+//
+// XXX: 2-D load can't be used in normal case while can't gaurantee contiguous register
+// allocation.
+// TODO: figure out a way to do contiguous reigster allocation and represented
+// as object.
+//
 template <int Row, int Wdith, DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
 struct Lsc2DLoad {
   template <typename T> static inline void run(
