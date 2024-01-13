@@ -39,31 +39,29 @@ struct tile_accumulate {
 
   void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> index) const {
 #if defined(__SYCL_DEVICE_ONLY__)
-    constexpr int M = sizeof(int) / sizeof(T);
+    int M = sizeof(int) / sizeof(T);
+    int pseudo_pitch = 64;
+    int sg_stride = N * pseudo_pitch;
+    int off = 0;
 
-    // occupy 64-byte register
-    union region {
-      sycl::vec<T, M*N> block;
-      sycl::vec<T, M> elem[N];
-    };
-    region tmp1;
-    region tmp2;
+    asm volatile (".decl Varray0 v_type=G type=d num_elts=128 align=wordx32\n");
 
-    constexpr int pseudo_pitch = 64;
-    constexpr int sg_stride = N * pseudo_pitch;
+    asm volatile ("\n"
+        "lsc_load_block2d.ugm (M1_NM, 1) Varray0:d32.1x8x16nn flat[%0, %1, %2, %3, %4, %5]\n"
+        :: "rw"(src + index * sg_stride), "rw"(pseudo_pitch), "rw"(N), "rw"(pseudo_pitch),
+        "rw"(off), "rw"(off));
+    asm volatile ("\n"
+        "lsc_store_block2d.ugm (M1_NM, 1) flat[%0, %1, %2, %3, %4, %5] Varray0:d32.1x8x16nn\n"
+        :: "rw"(dst + index * sg_stride), "rw"(pseudo_pitch), "rw"(N), "rw"(pseudo_pitch),
+        "rw"(off), "rw"(off));
 
-    lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
-        tmp1.elem, (void *)(src + index * sg_stride), pseudo_pitch, N, pseudo_pitch, 0, 0);
-    lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
-        tmp2.elem, (void *)(src + index * sg_stride), pseudo_pitch, N, pseudo_pitch, 0, 0);
+    // lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+    //     reg0, (void *)(src + index * sg_stride), pseudo_pitch, N, pseudo_pitch, 0, 0);
+    // lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+    //     reg1, (void *)(src + index * sg_stride), pseudo_pitch, N, pseudo_pitch, 0, 0);
 
-    region ret;
-#   pragma unroll
-    for (int i = 0; i < N; ++ i)
-      ret.elem[i] = tmp1.elem[i] + tmp2.elem[i];
-
-    lscStore<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
-        (void *)(dst + index * sg_stride), ret.elem, pseudo_pitch, N, pseudo_pitch, 0, 0);
+    // lscStore<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+    //     (void *)(dst + index * sg_stride), reg0, pseudo_pitch, N, pseudo_pitch, 0, 0);
 #else
     dst[index] += src[index];
 #endif
@@ -126,4 +124,13 @@ int main(int argc, char *argv[]) {
           reinterpret_cast<sycl::half *>(dst),
           reinterpret_cast<sycl::half *>(src)));
   });
+
+  queue.memcpy(b_check, dst, alloc_size);
+  queue.wait();
+
+  for (int k = 0; k < 4; ++ k) {
+    for (int i = 0; i < 32; ++ i)
+      std::cout<<((sycl::half *)b_check)[k*32 + i]<<", ";
+    std::cout<<std::endl;
+  }
 }
