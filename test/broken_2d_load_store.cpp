@@ -35,35 +35,36 @@ void fill_sequential(T *p, int rank, size_t nelems) {
 
 template <int N, typename T>
 struct tile_accumulate {
-  tile_accumulate(T* dst, T* src) : src(src), dst(dst) {}
+  tile_accumulate(T* dst, T* src, int surfaceH, int surfaceW, int surfaceP)
+    : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW), surfaceP(surfaceP)
+  {}
 
   void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> index) const {
 #if defined(__SYCL_DEVICE_ONLY__)
     constexpr int M = sizeof(int) / sizeof(T);
+    int pseudo_pitch = surfaceP -1;
+    int x_off = 0;
+    int y_off = index/SG_SZ * N;
+    int surface_height = surfaceH;
+    int surface_width = surfaceW -1;
 
-    // occupy 64-byte register
-    union region {
-      sycl::vec<T, M*N> block;
-      sycl::vec<T, M> elem[N];
-    };
-    region tmp1;
-    region tmp2;
-
-    constexpr int pseudo_pitch = 64;
-    constexpr int sg_stride = N * pseudo_pitch;
+    sycl::vec<T, M> reg0[N];
+    sycl::vec<T, M> reg1[N];
 
     lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
-        tmp1.elem, (void *)(src + index * sg_stride), pseudo_pitch, N, pseudo_pitch, 0, 0);
+        reg0, (void *)src, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
     lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
-        tmp2.elem, (void *)(src + index * sg_stride), pseudo_pitch, N, pseudo_pitch, 0, 0);
+        reg1, (void *)src, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
 
-    region ret;
+    sycl::vec<T, M> ret[N];
+
 #   pragma unroll
-    for (int i = 0; i < N; ++ i)
-      ret.elem[i] = tmp1.elem[i] + tmp2.elem[i];
+    for (int i = 0; i < N; ++ i) {
+      ret[i] = reg0[i] + reg1[i];
+    }
 
     lscStore<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
-        (void *)(dst + index * sg_stride), ret.elem, pseudo_pitch, N, pseudo_pitch, 0, 0);
+        (void *)dst, ret, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
 #else
     dst[index] += src[index];
 #endif
@@ -72,6 +73,9 @@ struct tile_accumulate {
 private:
   T* src;
   T* dst;
+  int surfaceH;
+  int surfaceW;
+  int surfaceP;
 };
 
 int main(int argc, char *argv[]) {
@@ -80,12 +84,21 @@ int main(int argc, char *argv[]) {
   opts.add_options()
     ("s,size", "Size of test buffer",
      cxxopts::value<std::string>()->default_value("32MB"))
+    ("h,height", "Height of the surface",
+     cxxopts::value<int>()->default_value("1024"))
+    ("w,width", "Width of the surface",
+     cxxopts::value<int>()->default_value("64"))
+    ("p,pitch", "Pitch of the surface",
+     cxxopts::value<int>()->default_value("32"))
     ;
 
   auto parsed_opts = opts.parse(argc, argv);
   auto sz_string = parsed_opts["size"].as<std::string>();
 
   auto alloc_size = parse_nelems(sz_string);
+  auto surfaceH = parsed_opts["height"].as<int>();
+  auto surfaceW = parsed_opts["width"].as<int>();
+  auto surfaceP = parsed_opts["pitch"].as<int>();
 
   auto queue = currentQueue(0, 0);
 
@@ -101,15 +114,16 @@ int main(int argc, char *argv[]) {
     sycl::free(b_check, queue);
   });
 
-  fill_sequential((sycl::half *)b_host, 1, alloc_size / sizeof(sycl::half));
+  fill_sequential((float *)b_host, 0., alloc_size / sizeof(float));
+
   queue.memcpy(src, b_host, alloc_size);
   queue.wait();
 
   constexpr int ROW = 8;
 
-  auto nelems = alloc_size / sizeof(sycl::half);
+  auto nelems = alloc_size / sizeof(float);
 
-  queue.fill<sycl::half>(dst, 1.2, nelems);
+  queue.fill<float>(dst, 1, nelems);
 
   auto block_sz = ROW * SG_SZ * sizeof(uint32_t);
   auto blocks = (alloc_size + block_sz - 1) / block_sz;
@@ -120,10 +134,31 @@ int main(int argc, char *argv[]) {
   //  |                                      |
   //  ----------------------------------------
 
+  std::cout<<"Num. of block: "<<blocks<<std::endl;
   queue.submit([&](sycl::handler &h) {
-    h.parallel_for(sycl::range<1> { blocks },
-        tile_accumulate<ROW, sycl::half>(
-          reinterpret_cast<sycl::half *>(dst),
-          reinterpret_cast<sycl::half *>(src)));
+    h.parallel_for(sycl::range<1> { blocks * SG_SZ },
+        tile_accumulate<ROW, float>(
+          reinterpret_cast<float *>(dst),
+          reinterpret_cast<float *>(src),
+          surfaceH, surfaceW, surfaceP));
   });
+
+  queue.memcpy(b_check, dst, alloc_size);
+  queue.wait();
+
+  std::cout<<"----------------------------------"<<std::endl;
+
+  for (int k = 0; k < 8; ++ k) {
+    for (int i = 0; i < 64/sizeof(float); ++ i)
+      std::cout<<((float *)b_check)[k*64/sizeof(float) + i]<<", ";
+    std::cout<<std::endl;
+  }
+
+  std::cout<<"----------------------------------"<<std::endl;
+
+  for (int k = 8; k < 16; ++ k) {
+    for (int i = 0; i < 64/sizeof(float); ++ i)
+      std::cout<<((float *)b_check)[k*64/sizeof(float) + i]<<", ";
+    std::cout<<std::endl;
+  }
 }

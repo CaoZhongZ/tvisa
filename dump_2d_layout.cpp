@@ -41,30 +41,37 @@ struct tile_accumulate {
 
   void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> index) const {
 #if defined(__SYCL_DEVICE_ONLY__)
-    constexpr int M = sizeof(int) / sizeof(T);
+    int M = sizeof(int) / sizeof(T);
     int pseudo_pitch = surfaceP -1;
     int x_off = 0;
     int y_off = index/SG_SZ * N;
     int surface_height = surfaceH;
     int surface_width = surfaceW -1;
 
-    sycl::vec<T, M> reg0[N];
-    sycl::vec<T, M> reg1[N];
+    asm volatile (".decl Varray0 v_type=G type=d num_elts=128 align=wordx32\n");
+    asm volatile (".decl Varray1 v_type=G type=d num_elts=16 align=wordx32 alias=<Varray0, 64>\n");
 
-    lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
-        reg0, (void *)src, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
-    lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
-        reg1, (void *)src, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
+    asm volatile ("\n"
+        "lsc_load_block2d.ugm (M1_NM, 1) Varray0:d32.16x8nn flat[%0, %1, %2, %3, %4, %5]\n"
+        // "lsc_store_block2d.ugm (M1_NM, 1) flat[%6, %1, %2, %3, %4, %5] Varray0:d32.16x8nn\n"
+        :: "rw"(src), "rw"(surface_width), "rw"(surface_height), "rw"(pseudo_pitch),
+        "rw"(x_off), "rw"(y_off), "rw"(dst));
 
-    sycl::vec<T, M> ret[N];
+    asm volatile ("\n"
+        "lsc_store.ugm (M1, 16) flat[%0]:a64 Varray0:d32\n"
+        :: "rw"(dst + index));
 
-#   pragma unroll
-    for (int i = 0; i < N; ++ i) {
-      ret[i] = reg0[i] + reg1[i];
-    }
+    asm volatile ("\n"
+        "lsc_store.ugm (M1, 16) flat[%0]:a64 Varray1:d32\n"
+        :: "rw"(dst + 64/sizeof(T) + index));
 
-    lscStore<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
-        (void *)dst, ret, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
+    // lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+    //     reg0, (void *)(src + index * sg_stride), pseudo_pitch, N, pseudo_pitch, 0, 0);
+    // lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+    //     reg1, (void *)(src + index * sg_stride), pseudo_pitch, N, pseudo_pitch, 0, 0);
+
+    // lscStore<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+    //     (void *)(dst + index * sg_stride), reg0, pseudo_pitch, N, pseudo_pitch, 0, 0);
 #else
     dst[index] += src[index];
 #endif

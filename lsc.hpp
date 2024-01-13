@@ -934,7 +934,7 @@ template <int BlockWdith, int BlockHeight,
          DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
 struct Lsc2DLoad {
   template <typename T> static inline void run(
-      T (& array)[Row], void* SurfaceBase,
+      T (& array)[BlockHeight], void* SurfaceBase,
       int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
       int Src0AddrX, int Src0Addr);
 };
@@ -981,7 +981,7 @@ struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 template <int BlockWdith, int BlockHeight, DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
 struct Lsc2DStore {
   template <typename T> static inline void run(
-      void* SurfaceBase, const T (&array)[Row],
+      void* SurfaceBase, const T (&array)[BlockHeight],
       int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
       int Src0AddrX, int Src0Addr);
 };
