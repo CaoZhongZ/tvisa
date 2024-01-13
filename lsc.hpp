@@ -928,8 +928,10 @@ template <> struct LscStore<4, 4, 32, CacheCtrl::L1UC_L3UC> {
 // allocation.
 // TODO: figure out a way to do contiguous reigster allocation and represented
 // as object.
+// All block 2d load should specify x first, then y.
 //
-template <int Row, int Wdith, DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
+template <int BlockWdith, int BlockHeight,
+         DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
 struct Lsc2DLoad {
   template <typename T> static inline void run(
       T (& array)[Row], void* SurfaceBase,
@@ -937,9 +939,9 @@ struct Lsc2DLoad {
       int Src0AddrX, int Src0Addr);
 };
 
-// Register 8x16 load
+// Register 8 rows load
 template <>
-struct Lsc2DLoad<8, 16, DataShuffle::none, CacheCtrl::DEFAULT> {
+struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(
     T (& array)[8], void* SurfaceBase,
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
@@ -947,7 +949,7 @@ struct Lsc2DLoad<8, 16, DataShuffle::none, CacheCtrl::DEFAULT> {
   ) {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
-        "lsc_load_block2d.ugm (M1_NM, 1) %0:d32.1x8x16nn flat[%1, %2, %3, %4, %5, %6]"
+        "lsc_load_block2d.ugm (M1_NM, 1) %0:d32.1x16x8nn flat[%1, %2, %3, %4, %5, %6]"
         :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
@@ -958,7 +960,7 @@ struct Lsc2DLoad<8, 16, DataShuffle::none, CacheCtrl::DEFAULT> {
 };
 
 template <>
-struct Lsc2DLoad<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
+struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(
     T (& array)[8], void* SurfaceBase,
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
@@ -966,7 +968,7 @@ struct Lsc2DLoad<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   ) {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
-        "lsc_load_block2d.ugm.uc.uc (M1_NM, 1) %0:d32.1x8x16nn flat[%1, %2, %3, %4, %5, %6]"
+        "lsc_load_block2d.ugm.uc.uc (M1_NM, 1) %0:d32.1x16x8nn flat[%1, %2, %3, %4, %5, %6]"
         :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
@@ -976,7 +978,7 @@ struct Lsc2DLoad<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   }
 };
 
-template <int Row, int Wdith, DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
+template <int BlockWdith, int BlockHeight, DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
 struct Lsc2DStore {
   template <typename T> static inline void run(
       void* SurfaceBase, const T (&array)[Row],
@@ -985,7 +987,7 @@ struct Lsc2DStore {
 };
 
 template <>
-struct Lsc2DStore<8, 16, DataShuffle::none, CacheCtrl::DEFAULT> {
+struct Lsc2DStore<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(
     void* SurfaceBase, T (& array)[8],
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
@@ -993,7 +995,7 @@ struct Lsc2DStore<8, 16, DataShuffle::none, CacheCtrl::DEFAULT> {
   ) {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
-        "lsc_store_block2d.ugm (M1_NM, 1) flat[%1, %2, %3, %4, %5, %6] %0:d32.1x8x16nn"
+        "lsc_store_block2d.ugm (M1_NM, 1) flat[%1, %2, %3, %4, %5, %6] %0:d32.1x16x8nn"
         :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
@@ -1004,7 +1006,7 @@ struct Lsc2DStore<8, 16, DataShuffle::none, CacheCtrl::DEFAULT> {
 };
 
 template <>
-struct Lsc2DStore<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
+struct Lsc2DStore<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(
     void* SurfaceBase, T (& array)[8],
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
@@ -1012,7 +1014,7 @@ struct Lsc2DStore<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   ) {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
-        "lsc_store_block2d.ugm.uc.uc (M1_NM, 1) flat[%1, %2, %3, %4, %5, %6] %0:d32.1x8x16nn"
+        "lsc_store_block2d.ugm.uc.uc (M1_NM, 1) flat[%1, %2, %3, %4, %5, %6] %0:d32.1x16x8nn"
         :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
@@ -1022,7 +1024,7 @@ struct Lsc2DStore<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   }
 };
 
-template <int Row, int Wdith,
+template <int BlockWidth, int BlockHeight,
          DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
 struct prefetch2D {
   template <typename T> static inline void run(
@@ -1030,13 +1032,13 @@ struct prefetch2D {
       int Src0AddrX, int Src0AddrY);
 };
 
-template <> struct prefetch2D<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
+template <> struct prefetch2D<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(
     T* SurfaceBase, int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY) {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
-        "lsc_load_block2d.ugm (M1_NM, 1) V0:d32.1x8x16nn flat[%1, %2, %3, %4, %5, %6]"
+        "lsc_load_block2d.ugm (M1_NM, 1) V0:d32.1x16x8nn flat[%1, %2, %3, %4, %5, %6]"
         :: "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
@@ -1049,8 +1051,8 @@ template <> struct prefetch2D<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 // TODO: enumerateLsc2DLoad(8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC, "nn", "uc.uc")
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 
-#define enumerateLsc2DLoad(row, colume, shuffle, cacheCtrl, shuffleStr, cacheStr) \
-  template <> struct Lsc2DLoad<row, colume, shuffle, cacheCtrl> {  \
+#define enumerateLsc2DLoad(width, height, shuffle, cacheCtrl, shuffleStr, cacheStr) \
+  template <> struct Lsc2DLoad<width, height, shuffle, cacheCtrl> {  \
     template <typename T> static inline void run( \
       T (& array)[row], void* SurfaceBase,  \
       int SurfaceWidth, int SurfaceHeight, int SurfacePitch,  \
@@ -1065,8 +1067,8 @@ template <> struct prefetch2D<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 
 #else
 
-#define enumerateLsc2DLoad(row, colume, shuffle, cacheCtrl, shuffleStr, cacheStr) \
-  template <> struct Lsc2DLoad<row, colume, shuffle, cacheCtrl> {  \
+#define enumerateLsc2DLoad(width, height, shuffle, cacheCtrl, shuffleStr, cacheStr) \
+  template <> struct Lsc2DLoad<width, height, shuffle, cacheCtrl> {  \
     template <typename T> static inline void run( \
       T (& array)[row], void* SurfaceBase,  \
       int SurfaceWidth, int SurfaceHeight, int SurfacePitch,  \
@@ -1118,12 +1120,12 @@ static inline void lscStore(void* addr, const sycl::vec<T, N>& var) {
 //    lscLoad<16, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
 //    array, adrs, 1024, 1024, 4096, 0, 0);
 
-template <int Width, DataShuffle Transpose, CacheCtrl CTL= CacheCtrl::DEFAULT,
-         typename T, int Row>
-static inline void lscLoad(T (&array) [Row], void* SurfaceBase,
+template <int BlockWidth, DataShuffle Transpose, CacheCtrl CTL= CacheCtrl::DEFAULT,
+         typename T, int BlockHeight>
+static inline void lscLoad(T (&array) [BlockHeight], void* SurfaceBase,
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY) {
-  Lsc2DLoad<Row, Width, Transpose, CTL>::template run<T>(
+  Lsc2DLoad<BlockWidth, BlockHeight, Transpose, CTL>::template run<T>(
       array, SurfaceBase,
       SurfaceWidth, SurfaceHeight, SurfacePitch,
       Src0AddrX, Src0AddrY);
@@ -1133,12 +1135,12 @@ static inline void lscLoad(T (&array) [Row], void* SurfaceBase,
 //    lscStore<16, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
 //    adrs, array, 1024, 1024, 4096, 0, 0);
 
-template <int Width, DataShuffle Transpose, CacheCtrl CTL= CacheCtrl::DEFAULT,
-         typename T, int Row>
-static inline void lscStore(void* SurfaceBase, T (&array) [Row],
+template <int BlockWidth, DataShuffle Transpose, CacheCtrl CTL= CacheCtrl::DEFAULT,
+         typename T, int BlockHeight>
+static inline void lscStore(void* SurfaceBase, T (&array) [BlockHeight],
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY) {
-  Lsc2DStore<Row, Width, Transpose, CTL>::template run<T>(
+  Lsc2DStore<BlockWidth, BlockHeight, Transpose, CTL>::template run<T>(
       SurfaceBase, array,
       SurfaceWidth, SurfaceHeight, SurfacePitch,
       Src0AddrX, Src0AddrY);
