@@ -41,7 +41,7 @@ struct LscStore {
 //
 template <> struct LscLoad<1, 1, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 16) %0:d8u32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -54,7 +54,7 @@ template <> struct LscLoad<1, 1, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<1, 2, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 16) %0:d16c32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -67,7 +67,7 @@ template <> struct LscLoad<1, 2, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<1, 4, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 16) %0:d32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -80,7 +80,7 @@ template <> struct LscLoad<1, 4, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<1, 8, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 16) %0:d32x2 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -93,7 +93,7 @@ template <> struct LscLoad<1, 8, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<1, 16, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 16) %0:d32x4 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -106,7 +106,7 @@ template <> struct LscLoad<1, 16, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<2, 1, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 16) %0:d16c32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -119,7 +119,7 @@ template <> struct LscLoad<2, 1, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<2, 2, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 16) %0:d32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -132,7 +132,7 @@ template <> struct LscLoad<2, 2, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<2, 4, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 16) %0:d32x2 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -145,7 +145,7 @@ template <> struct LscLoad<2, 4, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<2, 8, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 16) %0:d32x4 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -158,7 +158,7 @@ template <> struct LscLoad<2, 8, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<1, 1, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 16) %0:d8u32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -171,7 +171,7 @@ template <> struct LscLoad<1, 1, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<1, 2, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 16) %0:d16c32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -184,7 +184,7 @@ template <> struct LscLoad<1, 2, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<1, 4, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 16) %0:d32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -197,7 +197,7 @@ template <> struct LscLoad<1, 4, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<1, 8, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 16) %0:d32x2 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -210,7 +210,7 @@ template <> struct LscLoad<1, 8, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<1, 16, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 16) %0:d32x4 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -223,7 +223,7 @@ template <> struct LscLoad<1, 16, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<2, 1, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 16) %0:d16c32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -236,7 +236,7 @@ template <> struct LscLoad<2, 1, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<2, 2, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 16) %0:d32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -249,7 +249,7 @@ template <> struct LscLoad<2, 2, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<2, 4, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 16) %0:d32x2 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -262,7 +262,7 @@ template <> struct LscLoad<2, 4, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<2, 8, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 16) %0:d32x4 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -275,7 +275,7 @@ template <> struct LscLoad<2, 8, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<4, 1, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 16) %0:d32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -288,7 +288,7 @@ template <> struct LscLoad<4, 1, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<4, 2, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load.ugm (M1, 16) %0:d32x2 flat[%1]:a64\n"
         : "=rw"(var) : "rw" (addr));
@@ -301,7 +301,7 @@ template <> struct LscLoad<4, 2, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<4, 4, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load.ugm (M1, 16) %0:d32x4 flat[%1]:a64\n"
         : "=rw"(var) : "rw" (addr));
@@ -314,7 +314,7 @@ template <> struct LscLoad<4, 4, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<1, 1, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 32) %0:d8u32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -327,7 +327,7 @@ template <> struct LscLoad<1, 1, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<1, 2, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 32) %0:d16c32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -340,7 +340,7 @@ template <> struct LscLoad<1, 2, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<1, 4, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 32) %0:d32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -353,7 +353,7 @@ template <> struct LscLoad<1, 4, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<1, 8, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 32) %0:d32x2 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -366,7 +366,7 @@ template <> struct LscLoad<1, 8, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<1, 16, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 32) %0:d32x4 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -379,7 +379,7 @@ template <> struct LscLoad<1, 16, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<2, 1, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 32) %0:d16c32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -392,7 +392,7 @@ template <> struct LscLoad<2, 1, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<2, 2, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 32) %0:d32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -405,7 +405,7 @@ template <> struct LscLoad<2, 2, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<2, 4, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 32) %0:d32x2 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -418,7 +418,7 @@ template <> struct LscLoad<2, 4, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<2, 8, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm (M1, 32) %0:d32x4 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -431,7 +431,7 @@ template <> struct LscLoad<2, 8, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<1, 1, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 32) %0:d8u32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -444,7 +444,7 @@ template <> struct LscLoad<1, 1, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<1, 2, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 32) %0:d16c32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -457,7 +457,7 @@ template <> struct LscLoad<1, 2, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<1, 4, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 32) %0:d32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -470,7 +470,7 @@ template <> struct LscLoad<1, 4, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<1, 8, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 32) %0:d32x2 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -483,7 +483,7 @@ template <> struct LscLoad<1, 8, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<1, 16, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 32) %0:d32x4 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -496,7 +496,7 @@ template <> struct LscLoad<1, 16, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<2, 1, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 32) %0:d16c32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -509,7 +509,7 @@ template <> struct LscLoad<2, 1, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<2, 2, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 32) %0:d32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -522,7 +522,7 @@ template <> struct LscLoad<2, 2, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<2, 4, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 32) %0:d32x2 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -535,7 +535,7 @@ template <> struct LscLoad<2, 4, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<2, 8, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 32) %0:d32x4 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -548,7 +548,7 @@ template <> struct LscLoad<2, 8, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<4, 1, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load.ugm (M1, 32) %0:d32 flat[%1]:a64\n"
         : "=rw"(var) : "rw" (addr));
@@ -561,7 +561,7 @@ template <> struct LscLoad<4, 1, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<4, 2, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load.ugm (M1, 32) %0:d32x2 flat[%1]:a64\n"
         : "=rw"(var) : "rw" (addr));
@@ -574,7 +574,7 @@ template <> struct LscLoad<4, 2, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<4, 4, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load.ugm (M1, 32) %0:d32x4 flat[%1]:a64\n"
         : "=rw"(var) : "rw" (addr));
@@ -587,7 +587,7 @@ template <> struct LscLoad<4, 4, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<8, 1, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile (
         "lsc_load.ugm (M1, 16) %0:d64 flat[%1]:a64\n" :
         "=rw"(var) : "rw" (addr));
@@ -600,7 +600,7 @@ template <> struct LscLoad<8, 1, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscStore<2, 1, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm (M1, 16) flat[%0]:a64 %1:d16c32\n"
         :: "rw"(addr), "rw"(var));
@@ -613,7 +613,7 @@ template <> struct LscStore<2, 1, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscStore<2, 2, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm (M1, 16) flat[%0]:a64 %1:d32\n"
         :: "rw"(addr), "rw"(var));
@@ -626,7 +626,7 @@ template <> struct LscStore<2, 2, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscStore<2, 8, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm (M1, 16) flat[%0]:a64 %1:d32x4\n"
         :: "rw"(addr), "rw"(var));
@@ -639,7 +639,7 @@ template <> struct LscStore<2, 8, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscStore<4, 1, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm (M1, 16) flat[%0]:a64 %1:d32\n"
         :: "rw"(addr), "rw"(var));
@@ -652,7 +652,7 @@ template <> struct LscStore<4, 1, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscStore<4, 1, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm (M1, 32) flat[%0]:a64 %1:d32\n"
         :: "rw"(addr), "rw"(var));
@@ -665,7 +665,7 @@ template <> struct LscStore<4, 1, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscStore<4, 2, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm (M1, 16) flat[%0]:a64 %1:d32x2\n"
         :: "rw"(addr), "rw"(var));
@@ -678,7 +678,7 @@ template <> struct LscStore<4, 2, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscStore<4, 2, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm (M1, 32) flat[%0]:a64 %1:d32x2\n"
         :: "rw"(addr), "rw"(var));
@@ -691,7 +691,7 @@ template <> struct LscStore<4, 2, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscStore<4, 4, 16, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm (M1, 16) flat[%0]:a64 %1:d32x4\n"
         :: "rw"(addr), "rw"(var));
@@ -704,7 +704,7 @@ template <> struct LscStore<4, 4, 16, CacheCtrl::DEFAULT> {
 
 template <> struct LscStore<4, 4, 32, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm (M1, 32) flat[%0]:a64 %1:d32x4\n"
         :: "rw"(addr), "rw"(var));
@@ -717,7 +717,7 @@ template <> struct LscStore<4, 4, 32, CacheCtrl::DEFAULT> {
 
 template <> struct LscLoad<4, 1, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
       "lsc_load.ugm.uc.uc (M1, 16) %0:d32 flat[%1]:a64\n"
       : "=rw"(var) : "rw"(addr));
@@ -730,7 +730,7 @@ template <> struct LscLoad<4, 1, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<4, 2, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load.ugm.uc.uc (M1, 16) %0:d32x2 flat[%1]:a64\n"
         : "=rw"(var) : "rw" (addr));
@@ -743,7 +743,7 @@ template <> struct LscLoad<4, 2, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<4, 4, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load.ugm.uc.uc (M1, 16) %0:d32x4 flat[%1]:a64\n"
         : "=rw"(var) : "rw" (addr));
@@ -756,7 +756,7 @@ template <> struct LscLoad<4, 4, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<4, 1, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load.ugm.uc.uc (M1, 32) %0:d32 flat[%1]:a64\n"
         : "=rw"(var) : "rw" (addr));
@@ -769,7 +769,7 @@ template <> struct LscLoad<4, 1, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<4, 2, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load.ugm.uc.uc (M1, 32) %0:d32x2 flat[%1]:a64\n"
         : "=rw"(var) : "rw" (addr));
@@ -782,7 +782,7 @@ template <> struct LscLoad<4, 2, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<4, 4, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load.ugm.uc.uc (M1, 32) %0:d32x4 flat[%1]:a64\n"
         : "=rw"(var) : "rw" (addr));
@@ -795,7 +795,7 @@ template <> struct LscLoad<4, 4, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscLoad<8, 1, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(T& var, void* addr) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile (
         "lsc_load.ugm.uc.uc (M1, 16) %0:d64 flat[%1]:a64\n" :
         "=rw"(var) : "rw" (addr));
@@ -808,7 +808,7 @@ template <> struct LscLoad<8, 1, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscStore<2, 1, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm.uc.uc (M1, 16) flat[%0]:a64 %1:d16c32\n"
         :: "rw"(addr), "rw"(var));
@@ -821,7 +821,7 @@ template <> struct LscStore<2, 1, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscStore<2, 2, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm.uc.uc (M1, 16) flat[%0]:a64 %1:d32\n"
         :: "rw"(addr), "rw"(var));
@@ -834,7 +834,7 @@ template <> struct LscStore<2, 2, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscStore<2, 8, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm.uc.uc (M1, 16) flat[%0]:a64 %1:d32x4\n"
         :: "rw"(addr), "rw"(var));
@@ -847,7 +847,7 @@ template <> struct LscStore<2, 8, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscStore<4, 1, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm.uc.uc (M1, 16) flat[%0]:a64 %1:d32\n"
         :: "rw"(addr), "rw"(var));
@@ -860,7 +860,7 @@ template <> struct LscStore<4, 1, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscStore<4, 1, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm.uc.uc (M1, 32) flat[%0]:a64 %1:d32\n"
         :: "rw"(addr), "rw"(var));
@@ -873,7 +873,7 @@ template <> struct LscStore<4, 1, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscStore<4, 2, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm.uc.uc (M1, 16) flat[%0]:a64 %1:d32x2\n"
         :: "rw"(addr), "rw"(var));
@@ -886,7 +886,7 @@ template <> struct LscStore<4, 2, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscStore<4, 2, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm.uc.uc (M1, 32) flat[%0]:a64 %1:d32x2\n"
         :: "rw"(addr), "rw"(var));
@@ -899,7 +899,7 @@ template <> struct LscStore<4, 2, 32, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscStore<4, 4, 16, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm.uc.uc (M1, 16) flat[%0]:a64 %1:d32x4\n"
         :: "rw"(addr), "rw"(var));
@@ -912,7 +912,7 @@ template <> struct LscStore<4, 4, 16, CacheCtrl::L1UC_L3UC> {
 
 template <> struct LscStore<4, 4, 32, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(void *addr, const T& var) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store.ugm.uc.uc (M1, 32) flat[%0]:a64 %1:d32x4\n"
         :: "rw"(addr), "rw"(var));
@@ -945,7 +945,7 @@ struct Lsc2DLoad<8, 16, DataShuffle::none, CacheCtrl::DEFAULT> {
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY
   ) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load_block2d.ugm (M1_NM, 1) %0:d32.1x8x16nn flat[%1, %2, %3, %4, %5, %6]"
         :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
@@ -964,7 +964,7 @@ struct Lsc2DLoad<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY
   ) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load_block2d.ugm.uc.uc (M1_NM, 1) %0:d32.1x8x16nn flat[%1, %2, %3, %4, %5, %6]"
         :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
@@ -991,7 +991,7 @@ struct Lsc2DStore<8, 16, DataShuffle::none, CacheCtrl::DEFAULT> {
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY
   ) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store_block2d.ugm (M1_NM, 1) flat[%1, %2, %3, %4, %5, %6] %0:d32.1x8x16nn"
         :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
@@ -1010,7 +1010,7 @@ struct Lsc2DStore<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY
   ) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store_block2d.ugm.uc.uc (M1_NM, 1) flat[%1, %2, %3, %4, %5, %6] %0:d32.1x8x16nn"
         :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
@@ -1034,7 +1034,7 @@ template <> struct prefetch2D<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(
     T* SurfaceBase, int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY) {
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load_block2d.ugm (M1_NM, 1) V0:d32.1x8x16nn flat[%1, %2, %3, %4, %5, %6]"
         :: "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
@@ -1047,7 +1047,7 @@ template <> struct prefetch2D<8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 };
 
 // TODO: enumerateLsc2DLoad(8, 16, DataShuffle::none, CacheCtrl::L1UC_L3UC, "nn", "uc.uc")
-#if defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 
 #define enumerateLsc2DLoad(row, colume, shuffle, cacheCtrl, shuffleStr, cacheStr) \
   template <> struct Lsc2DLoad<row, colume, shuffle, cacheCtrl> {  \
