@@ -84,6 +84,9 @@ spirv_ext=-all,+SPV_EXT_shader_atomic_float_add,+SPV_EXT_shader_atomic_float_min
 copy_verify : copy_verify.o sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
+barrier_test : barrier_test.o sycl_misc.o
+	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
+
 dump : dump.o sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 

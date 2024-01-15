@@ -950,7 +950,7 @@ struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load_block2d.ugm (M1_NM, 1) %0:d32.1x16x8nn flat[%1, %2, %3, %4, %5, %6]"
-        :: "rw"(reinterpret_cast<sycl::vec<T, 8>::vector_t&>(array)),
+        :: "rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array)),
         "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
@@ -970,7 +970,7 @@ struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load_block2d.ugm.uc.uc (M1_NM, 1) %0:d32.1x16x8nn flat[%1, %2, %3, %4, %5, %6]"
-        :: "rw"(reinterpret_cast<sycl::vec<T, 8>::vector_t&>(array)),
+        :: "rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array)),
         "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
@@ -999,7 +999,7 @@ struct Lsc2DStore<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store_block2d.ugm (M1_NM, 1) flat[%1, %2, %3, %4, %5, %6] %0:d32.1x16x8nn"
-        :: "rw"(reinterpret_cast<sycl::vec<T, 8>::vector_t &>(array)),
+        :: "rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t &>(array)),
         "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
@@ -1019,7 +1019,7 @@ struct Lsc2DStore<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store_block2d.ugm.uc.uc (M1_NM, 1) flat[%1, %2, %3, %4, %5, %6] %0:d32.1x16x8nn"
-        :: "rw"(reinterpret_cast<sycl::vec<T, 8>::vector_t &>(array)),
+        :: "rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t &>(array)),
         "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
