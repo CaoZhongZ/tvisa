@@ -934,7 +934,7 @@ template <int BlockWdith, int BlockHeight,
          DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
 struct Lsc2DLoad {
   template <typename T> static inline void run(
-      T (& array)[BlockHeight], void* SurfaceBase,
+      sycl::vec<T, BlockHeight>& array, void* SurfaceBase,
       int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
       int Src0AddrX, int Src0Addr);
 };
@@ -943,14 +943,15 @@ struct Lsc2DLoad {
 template <>
 struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(
-    T (& array)[8], void* SurfaceBase,
+    sycl::vec<T, 8>& array, void* SurfaceBase,
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY
   ) {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load_block2d.ugm (M1_NM, 1) %0:d32.1x16x8nn flat[%1, %2, %3, %4, %5, %6]"
-        :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
+        :: "rw"(reinterpret_cast<sycl::vec<T, 8>::vector_t&>(array)),
+        "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
     static_assert(false,
@@ -962,14 +963,15 @@ struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
 template <>
 struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(
-    T (& array)[8], void* SurfaceBase,
+    sycl::vec<T, 8>& array, void* SurfaceBase,
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY
   ) {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_load_block2d.ugm.uc.uc (M1_NM, 1) %0:d32.1x16x8nn flat[%1, %2, %3, %4, %5, %6]"
-        :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
+        :: "rw"(reinterpret_cast<sycl::vec<T, 8>::vector_t&>(array)),
+        "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
     static_assert(false,
@@ -978,10 +980,11 @@ struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   }
 };
 
-template <int BlockWdith, int BlockHeight, DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
+template <int BlockWdith, int BlockHeight,
+         DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
 struct Lsc2DStore {
   template <typename T> static inline void run(
-      void* SurfaceBase, const T (&array)[BlockHeight],
+      void* SurfaceBase, const sycl::vec<T, BlockHeight>& array,
       int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
       int Src0AddrX, int Src0Addr);
 };
@@ -989,14 +992,15 @@ struct Lsc2DStore {
 template <>
 struct Lsc2DStore<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(
-    void* SurfaceBase, T (& array)[8],
+    void* SurfaceBase, sycl::vec<T, 8>& array,
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY
   ) {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store_block2d.ugm (M1_NM, 1) flat[%1, %2, %3, %4, %5, %6] %0:d32.1x16x8nn"
-        :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
+        :: "rw"(reinterpret_cast<sycl::vec<T, 8>::vector_t &>(array)),
+        "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
     static_assert(false,
@@ -1008,14 +1012,15 @@ struct Lsc2DStore<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
 template <>
 struct Lsc2DStore<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(
-    void* SurfaceBase, T (& array)[8],
+    void* SurfaceBase, sycl::vec<T, 8>& array,
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY
   ) {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
     asm volatile ("\n"
         "lsc_store_block2d.ugm.uc.uc (M1_NM, 1) flat[%1, %2, %3, %4, %5, %6] %0:d32.1x16x8nn"
-        :: "rw"(array), "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
+        :: "rw"(reinterpret_cast<sycl::vec<T, 8>::vector_t &>(array)),
+        "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
 #else
     static_assert(false,
