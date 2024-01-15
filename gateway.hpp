@@ -9,11 +9,11 @@ static inline void barrier() {
 }
 
 static inline void nbarrier_wait(uint8_t id) {
-  asm volatile ("nbarrier.wait %0" :: "rw"(id));
+  asm volatile ("nbarrier.wait %0(0,0)<0;1,0>" :: "rw"(id));
 }
 
 static inline void nbarrier_signal(uint8_t n_threads, uint8_t id) {
-  asm volatile ("nbarrier.signal %0 %1" :: "rw"(n_threads), "rw"(id));
+  asm volatile ("nbarrier.signal %0(0,0)<0;1,0> %1(0,0)<0;1,0>" :: "rw"(n_threads), "rw"(id));
 }
 
 static inline void sbarrier_wait() {
