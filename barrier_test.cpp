@@ -49,15 +49,6 @@ struct barrier_test {
 
     nbarrier_signal(n_threads, id);
     nbarrier_wait(id);
-
-    // See how optimization goes
-    nbarrier_signal(n_threads, id);
-    nbarrier_wait(id);
-
-    auto alter_id = sg_id / 4;
-
-    nbarrier_signal(n_threads, alter_id);
-    nbarrier_wait(alter_id);
 #endif
   }
 };
