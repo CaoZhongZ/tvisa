@@ -19,7 +19,6 @@ sycl::device getSubDevice() {
 
     return subs[map_nsub];
   } catch (sycl::exception &e) {
-    std::cout<<e.what()<<std::endl;
     return dev;
   };
 }
