@@ -97,4 +97,4 @@ onepass : onepass.o
 	$(CXX) $(V) $(LINKFLAGS) -o $@ $<
 
 clean :
-	rm -f copy_verify dump main accessor *.o *.header.hpp *.footer.hpp *.bc onepass ./tmp/*
+	rm -f barrier_test copy_verify dump main accessor *.o *.header.hpp *.footer.hpp *.bc onepass ./tmp/*
