@@ -47,6 +47,11 @@ struct barrier_test {
     auto n_threads = n_sg / 4;
     auto id = sg_id % 4;
 
+    named_barrier_init(1);
+    named_barrier_init(2);
+    named_barrier_init(3);
+    named_barrier_init(4);
+
     nbarrier_signal(id, n_threads);
     nbarrier_wait(id);
 #endif
