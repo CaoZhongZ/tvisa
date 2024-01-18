@@ -7,6 +7,13 @@
 
 extern SYCL_EXTERNAL void named_barrier_init(int count);
 
+template <int N> void named_barrier_init() {
+  if constexpr (N -1 > 0)
+    named_barrier_init<N -1>();
+
+  named_barrier_init(N);
+}
+
 static inline void barrier() {
   asm volatile ("barrier");
 }
