@@ -22,7 +22,7 @@ LINKTARGET=-Xsycl-target-backend=nvptx64-nvidia-cuda '--cuda-gpu-arch=sm_86'
 OFFLOAD=sycl-nvptx64-nvidia-cuda
 else
 TARGET=spir64_gen
-LINKTARGET=-Xsycl-target-backend=spir64_gen "-device $(ENABLE_AOT) -internal_options -ze-intel-has-buffer-offset-arg -internal_options -cl-intel-greater-than-4GB-buffer-required"
+LINKTARGET=-Xsycl-target-backend=spir64_gen "-device $(ENABLE_AOT)"
 OFFLOAD=sycl-spir64_gen-unknown-unknown
 endif
 
