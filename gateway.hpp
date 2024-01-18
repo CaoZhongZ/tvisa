@@ -5,6 +5,10 @@
 // barrier, named barrier and split barrier
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 
+//
+// Use OpenCL named barrier initialization to trigger compiler
+// allocate named barrier.
+//
 extern SYCL_EXTERNAL void named_barrier_init(int count);
 
 template <int N> void named_barrier_init() {
