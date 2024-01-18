@@ -5,7 +5,7 @@
 // barrier, named barrier and split barrier
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 
-extern SYCL_EXTERNAL void named_barrier_init(uint8_t count);
+extern SYCL_EXTERNAL void named_barrier_init(int count);
 
 static inline void barrier() {
   asm volatile ("barrier");
