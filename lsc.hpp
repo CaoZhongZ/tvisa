@@ -585,11 +585,8 @@ template <> struct LscStore<4, 4, 32, CacheCtrl::L1UC_L3UC> {
 };
 #endif
 //
-// XXX: 2-D load can't be used in normal case while can't gaurantee contiguous register
-// allocation.
-// TODO: figure out a way to do contiguous reigster allocation and represented
-// as object.
-// All block 2d load should specify x first, then y.
+// Register allocation
+//  Only OpenCL vector type could gurantee IGC do contiguous allocation
 //
 template <int BlockWdith, int BlockHeight,
          DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
@@ -602,7 +599,6 @@ struct Lsc2DLoad {
 
 
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
-// Register 8 rows load
 template <>
 struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(
@@ -612,7 +608,7 @@ struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
   ) {
     asm volatile ("\n"
         "lsc_load_block2d.ugm (M1_NM, 1) %0:d32.1x16x8nn flat[%1, %2, %3, %4, %5, %6]"
-        :: "rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array)),
+        : "=rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array)) :
         "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
   }
@@ -627,7 +623,37 @@ struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   ) {
     asm volatile ("\n"
         "lsc_load_block2d.ugm.uc.uc (M1_NM, 1) %0:d32.1x16x8nn flat[%1, %2, %3, %4, %5, %6]"
-        :: "rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array)),
+        : "=rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array)) :
+        "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
+        "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
+  }
+};
+
+template <>
+struct Lsc2DLoad<16, 4, DataShuffle::none, CacheCtrl::DEFAULT> {
+  template <typename T> static inline void run(
+    sycl::vec<T, 4>& array, void* SurfaceBase,
+    int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
+    int Src0AddrX, int Src0AddrY
+  ) {
+    asm volatile ("\n"
+        "lsc_load_block2d.ugm (M1_NM, 1) %0:d32.1x16x4nn flat[%1, %2, %3, %4, %5, %6]"
+        : "=rw"(reinterpret_cast<typename sycl::vec<T, 4>::vector_t&>(array)) :
+        "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
+        "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
+  }
+};
+
+template <>
+struct Lsc2DLoad<16, 4, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
+  template <typename T> static inline void run(
+    sycl::vec<T, 4>& array, void* SurfaceBase,
+    int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
+    int Src0AddrX, int Src0AddrY
+  ) {
+    asm volatile ("\n"
+        "lsc_load_block2d.ugm.uc.uc (M1_NM, 1) %0:d32.1x16x4nn flat[%1, %2, %3, %4, %5, %6]"
+        : "=rw"(reinterpret_cast<typename sycl::vec<T, 4>::vector_t&>(array)) :
         "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
         "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY));
   }
@@ -754,7 +780,7 @@ static inline void lscStore(void* addr, const sycl::vec<T, N>& var) {
 
 template <int BlockWidth, DataShuffle Transpose, CacheCtrl CTL= CacheCtrl::DEFAULT,
          typename T, int BlockHeight>
-static inline void lscLoad(T (&array) [BlockHeight], void* SurfaceBase,
+static inline void lscLoad(sycl::vec<T, BlockHeight>& array, void* SurfaceBase,
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY) {
   Lsc2DLoad<BlockWidth, BlockHeight, Transpose, CTL>::template run<T>(
@@ -769,7 +795,7 @@ static inline void lscLoad(T (&array) [BlockHeight], void* SurfaceBase,
 
 template <int BlockWidth, DataShuffle Transpose, CacheCtrl CTL= CacheCtrl::DEFAULT,
          typename T, int BlockHeight>
-static inline void lscStore(void* SurfaceBase, T (&array) [BlockHeight],
+static inline void lscStore(void* SurfaceBase, sycl::vec<T, BlockHeight>& array,
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch,
     int Src0AddrX, int Src0AddrY) {
   Lsc2DStore<BlockWidth, BlockHeight, Transpose, CTL>::template run<T>(

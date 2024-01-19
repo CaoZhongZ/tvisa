@@ -41,27 +41,21 @@ struct tile_accumulate {
 
   void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> index) const {
 #if defined(__SYCL_DEVICE_ONLY__)
-    constexpr int M = sizeof(int) / sizeof(T);
     int pseudo_pitch = surfaceP -1;
     int x_off = 0;
     int y_off = index/SG_SZ * N;
     int surface_height = surfaceH;
     int surface_width = surfaceW -1;
 
-    sycl::vec<T, M> reg0[N];
-    sycl::vec<T, M> reg1[N];
+    sycl::vec<T, N> tmp0;
+    sycl::vec<T, N> tmp1;
 
     lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
-        reg0, (void *)src, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
+        tmp0, (void *)src, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
     lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
-        reg1, (void *)src, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
+        tmp1, (void *)dst, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
 
-    sycl::vec<T, M> ret[N];
-
-#   pragma unroll
-    for (int i = 0; i < N; ++ i) {
-      ret[i] = reg0[i] + reg1[i];
-    }
+    auto ret = tmp0 + tmp1;
 
     lscStore<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
         (void *)dst, ret, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
