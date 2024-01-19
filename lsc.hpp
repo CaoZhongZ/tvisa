@@ -738,8 +738,36 @@ template <> struct prefetch2D<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   };
 
 #endif
-
 } // enumrate space
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
+
+union packParams {
+  uint32_t ret32;
+  uint64_t ret64;
+};
+
+packParams packBlockParams(
+    void* SurfaceBase,
+    int SurfaceWidth, int SurfaceHeight, int SurfacePitch, int Src0AddrX, int Src0AddrY
+) {
+  packParams tmp;
+
+  asm volatile ("\n"
+      "mov (M1, 1) %1(0, 0)<1> %2(0, 0)<0;1,0>\n"
+      "mov (M1, 1) %0(0, 2)<1> %3(0, 0)<0;1,0>\n"
+      "mov (M1, 1) %0(0, 3)<1> %4(0, 0)<0;1,0>\n"
+      "mov (M1, 1) %0(0, 4)<1> %5(0, 0)<0;1,0>\n"
+      "mov (M1, 1) %0(0, 5)<1> %6(0, 0)<0;1,0>\n"
+      "mov (M1, 1) %0(0, 6)<1> %7(0, 0)<0;1,0>\n"
+      : "=rw"(tmp.ret32), "=rw"(tmp.ret64) :
+      "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
+      "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY)
+  );
+
+  return tmp;
+}
+
+#endif
 
 // API
 template <int subGroupSize, CacheCtrl CTL= CacheCtrl::DEFAULT, typename T>
