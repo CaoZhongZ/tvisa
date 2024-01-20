@@ -41,16 +41,24 @@ struct tile_accumulate {
 
   void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> index) const {
 #if defined(__SYCL_DEVICE_ONLY__)
-    int pseudo_pitch = surfaceP;
+    int pseudo_pitch = surfaceP -1;
     int x_off = 0;
     int y_off = index/SG_SZ * N;
     int surface_height = surfaceH;
-    int surface_width = surfaceW;
+    int surface_width = surfaceW -1;
 
-    auto packed = AddressPayload<16,8,1>(
-        src, surface_width, surface_height, pseudo_pitch, x_off, y_off);
+    sycl::vec<T, N> tmp0;
+    sycl::vec<T, N> tmp1;
 
-    lscStore<SG_SZ, CacheCtrl::L1UC_L3UC>(dst + index, packed.getPayload());
+    lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+        tmp0, (void *)src, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
+    lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+        tmp1, (void *)dst, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
+
+    auto ret = tmp0 + tmp1;
+
+    lscStore<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+        (void *)dst, ret, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
 #else
     dst[index] += src[index];
 #endif
@@ -132,10 +140,19 @@ int main(int argc, char *argv[]) {
   queue.memcpy(b_check, dst, alloc_size);
   queue.wait();
 
-  printf("address=%p, %p\n", src, dst);
-  printf("%p, %u, %u, %u, %u, %u, %#x\n",
-      ((void **)b_check)[0], ((uint32_t *)b_check)[2],
-      ((uint32_t *)b_check)[3], ((uint32_t *)b_check)[4],
-      ((uint32_t *)b_check)[5], ((uint32_t *)b_check)[6],
-      ((uint32_t *)b_check)[7]);
+  std::cout<<"----------------------------------"<<std::endl;
+
+  for (int k = 0; k < 8; ++ k) {
+    for (int i = 0; i < 64/sizeof(float); ++ i)
+      std::cout<<((float *)b_check)[k*64/sizeof(float) + i]<<", ";
+    std::cout<<std::endl;
+  }
+
+  std::cout<<"----------------------------------"<<std::endl;
+
+  for (int k = 8; k < 16; ++ k) {
+    for (int i = 0; i < 64/sizeof(float); ++ i)
+      std::cout<<((float *)b_check)[k*64/sizeof(float) + i]<<", ";
+    std::cout<<std::endl;
+  }
 }

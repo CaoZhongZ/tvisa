@@ -762,11 +762,11 @@ struct AddressPayload {
         "mov (M1, 1) %0(0, 6)<1> %6(0, 0)<0;1,0> \n"
         "mov (M1, 1) %0(0, 7)<1> %7\n"
         "}\n"
-        : "+rw"(PayLoadReg) : "rw"(SurfaceBase), "rw"(SurfaceWidth),
+        : "+rw"(payloadReg_) : "rw"(SurfaceBase), "rw"(SurfaceWidth),
         "rw"(SurfaceHeight), "rw"(SurfacePitch), "rw"(Src0AddrX),
         "rw"(Src0AddrY), "i"(BWHAL)
         /*
-        : "+rw"(PayLoadReg) : "rw.u"(SurfaceBase), "rw.u"(SurfaceWidth),
+        : "+rw"(payloadReg_) : "rw.u"(SurfaceBase), "rw.u"(SurfaceWidth),
         "rw.u"(SurfaceHeight), "rw.u"(SurfacePitch), "rw.u"(Src0AddrX),
         "rw.u"(Src0AddrY), "i"(BWHAL)
         */
@@ -774,10 +774,10 @@ struct AddressPayload {
   }
 
   inline uint32_t& getPayload() {
-    return PayLoadReg;
+    return payloadReg_;
   }
 private:
-  uint32_t PayLoadReg;
+  uint32_t payloadReg_;
 };
 
 template <int BlockWidth, int BlockHeight, int ArrayLength>
