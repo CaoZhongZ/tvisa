@@ -742,9 +742,12 @@ template <> struct prefetch2D<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 
-
 template <int BlockWidth, int BlockHeight, int ArrayLength = 1>
 struct AddressPayload {
+  inline AddressPayload(const AddressPayload& payload) {
+    payloadReg_ = payload.getPayload();
+  }
+
   inline AddressPayload(
     void* SurfaceBase,
     uint32_t SurfaceWidth, uint32_t SurfaceHeight,
@@ -772,6 +775,11 @@ struct AddressPayload {
         "rw.u"(Src0AddrY), "i"(BWHAL)
         */
     );
+  }
+
+  inline AddressPayload& operator = (const AddressPayload& payload) {
+    payloadReg_ = payload.getPayload();
+    return payloadReg_;
   }
 
   inline uint32_t& getPayload() {
@@ -820,6 +828,11 @@ struct AddressPayload {
         : "=rw"(payloadReg_) : "rw"(y_off)
     );
     return payloadReg_;
+  }
+
+  // fork base and return new one
+  inline AddressPayload cloneUpdateSurfaceBase(void * addr) const {
+    return updateSurfaceBase(addr);
   }
 private:
   uint32_t payloadReg_;
@@ -915,7 +928,7 @@ struct Lsc2DLoad<16, 4, DataShuffle::none, CacheCtrl::DEFAULT> {
   ) {
     asm volatile ("\n"
         "raw_sends.15.1.0.4 (M1, 1) 0x0:ud 0x2400403:ud %1 V0 %0\n"
-        : "=rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array))
+        : "=rw"(reinterpret_cast<typename sycl::vec<T, 4>::vector_t&>(array))
         : "rw"(address.getPayload()));
   }
 };
@@ -927,7 +940,7 @@ struct Lsc2DLoad<16, 4, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   ) {
     asm volatile ("\n"
         "raw_sends.15.1.0.4 (M1, 1) 0x0:ud 0x2420403:ud %1 V0 %0\n"
-        : "=rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array))
+        : "=rw"(reinterpret_cast<typename sycl::vec<T, 4>::vector_t&>(array))
         : "rw"(address.getPayload()));
   }
 };
@@ -976,7 +989,7 @@ struct Lsc2DStore<16, 4, DataShuffle::none, CacheCtrl::DEFAULT> {
     asm volatile ("\n"
         "raw_sends.15.1.8.0 (M1, 1) 0x0:ud 0x2400407:ud %0 %1 V0\n" ::
         "rw"(address.getPayload()),
-        "rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array))
+        "rw"(reinterpret_cast<typename sycl::vec<T, 4>::vector_t&>(array))
     );
   }
 };
@@ -989,7 +1002,7 @@ struct Lsc2DStore<16, 4, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
     asm volatile ("\n"
         "raw_sends.15.1.8.0 (M1, 1) 0x0:ud 0x2420407:ud %0 %1 V0\n" ::
         "rw"(address.getPayload()),
-        "rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array))
+        "rw"(reinterpret_cast<typename sycl::vec<T, 4>::vector_t&>(array))
   }
 };
 
