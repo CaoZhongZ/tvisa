@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
   queue.memcpy(src, b_host, alloc_size);
   queue.wait();
 
-  constexpr int ROW = 8;
+  constexpr int ROW = 16;
 
   auto nelems = alloc_size / sizeof(float);
 
@@ -131,6 +131,7 @@ int main(int argc, char *argv[]) {
   //  ----------------------------------------
 
   std::cout<<"Num. of block: "<<blocks<<std::endl;
+
   queue.submit([&](sycl::handler &h) {
     h.parallel_for(sycl::range<1> { blocks * SG_SZ },
         tile_accumulate<ROW, float>(
@@ -144,7 +145,7 @@ int main(int argc, char *argv[]) {
 
   std::cout<<"----------------------------------"<<std::endl;
 
-  for (int k = 0; k < 8; ++ k) {
+  for (int k = 0; k < ROW; ++ k) {
     for (int i = 0; i < 64/sizeof(float); ++ i)
       std::cout<<((float *)b_check)[k*64/sizeof(float) + i]<<", ";
     std::cout<<std::endl;
@@ -152,7 +153,7 @@ int main(int argc, char *argv[]) {
 
   std::cout<<"----------------------------------"<<std::endl;
 
-  for (int k = 8; k < 16; ++ k) {
+  for (int k = ROW; k < 2 * ROW; ++ k) {
     for (int i = 0; i < 64/sizeof(float); ++ i)
       std::cout<<((float *)b_check)[k*64/sizeof(float) + i]<<", ";
     std::cout<<std::endl;
