@@ -741,30 +741,75 @@ template <> struct prefetch2D<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 } // enumrate space
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 
-union packParams {
-  uint32_t ret32;
-  uint64_t ret64;
+
+template <int BlockWidth, int BlockHeight, int ArrayLength>
+struct AddressPayload {
+  inline AddressPayload(
+    void* SurfaceBase,
+    int SurfaceWidth, int SurfaceHeight,
+    int SurfacePitch, int Src0AddrX, int Src0AddrY
+  ) {
+    constexpr uint32_t BWHAL = (BlockWidth -1)
+      | (BlockHeight -1) << 8 | ((ArrayLength -1) & 0xf) << 16;
+
+    asm volatile ("{\n"
+        ".decl alias64 v_type=G type=q num_elts=8 align=GRF alias=<%0, 0>\n"
+        "mov (M1, 1) alias64(0, 0)<1> %1(0, 0)<0;1,0>\n"
+        "add (M1, 1) %0(0, 2)<1> %2(0, 0)<0;1,0> -1:ud\n"
+        "add (M1, 1) %0(0, 3)<1> %3(0, 0)<0;1,0> -1:ud\n"
+        "add (M1, 1) %0(0, 4)<1> %4(0, 0)<0;1,0> -1:ud\n"
+        "mov (M1, 1) %0(0, 5)<1> %5(0, 0)<0;1,0> \n"
+        "mov (M1, 1) %0(0, 6)<1> %6(0, 0)<0;1,0> \n"
+        "mov (M1, 1) %0(0, 7)<1> %7\n"
+        "}\n"
+        : "+rw"(PayLoadReg) : "rw"(SurfaceBase), "rw"(SurfaceWidth),
+        "rw"(SurfaceHeight), "rw"(SurfacePitch), "rw"(Src0AddrX),
+        "rw"(Src0AddrY), "i"(BWHAL)
+        /*
+        : "+rw"(PayLoadReg) : "rw.u"(SurfaceBase), "rw.u"(SurfaceWidth),
+        "rw.u"(SurfaceHeight), "rw.u"(SurfacePitch), "rw.u"(Src0AddrX),
+        "rw.u"(Src0AddrY), "i"(BWHAL)
+        */
+    );
+  }
+
+  inline uint32_t& getPayload() {
+    return PayLoadReg;
+  }
+private:
+  uint32_t PayLoadReg;
 };
 
-packParams packBlockParams(
+template <int BlockWidth, int BlockHeight, int ArrayLength>
+static inline uint32_t packAddressPayload (
     void* SurfaceBase,
     int SurfaceWidth, int SurfaceHeight, int SurfacePitch, int Src0AddrX, int Src0AddrY
 ) {
-  packParams tmp;
+  uint32_t addressPayload;
+  constexpr uint32_t BWHAL = (BlockWidth-1)
+    | (BlockHeight-1) << 8 | ((ArrayLength -1) & 0xf) << 16;
 
-  asm volatile ("\n"
-      "mov (M1, 1) %1(0, 0)<1> %2(0, 0)<0;1,0>\n"
-      "mov (M1, 1) %0(0, 2)<1> %3(0, 0)<0;1,0>\n"
-      "mov (M1, 1) %0(0, 3)<1> %4(0, 0)<0;1,0>\n"
-      "mov (M1, 1) %0(0, 4)<1> %5(0, 0)<0;1,0>\n"
-      "mov (M1, 1) %0(0, 5)<1> %6(0, 0)<0;1,0>\n"
-      "mov (M1, 1) %0(0, 6)<1> %7(0, 0)<0;1,0>\n"
-      : "=rw"(tmp.ret32), "=rw"(tmp.ret64) :
-      "rw"(SurfaceBase), "rw"(SurfaceWidth), "rw"(SurfaceHeight),
-      "rw"(SurfacePitch), "rw"(Src0AddrX), "rw"(Src0AddrY)
+  asm volatile ("{\n"
+      ".decl alias64 v_type=G type=q num_elts=8 align=GRF alias=<%0, 0>\n"
+      "mov (M1, 1) alias64(0, 0)<1> %1(0, 0)<0;1,0>\n"
+      "add (M1, 1) %0(0, 2)<1> %2(0, 0)<0;1,0> -1:ud\n"
+      "add (M1, 1) %0(0, 3)<1> %3(0, 0)<0;1,0> -1:ud\n"
+      "add (M1, 1) %0(0, 4)<1> %4(0, 0)<0;1,0> -1:ud\n"
+      "mov (M1, 1) %0(0, 5)<1> %5(0, 0)<0;1,0> \n"
+      "mov (M1, 1) %0(0, 6)<1> %6(0, 0)<0;1,0> \n"
+      "mov (M1, 1) %0(0, 7)<1> %7\n"
+      "}\n"
+      : "+rw"(addressPayload) : "rw"(SurfaceBase), "rw"(SurfaceWidth),
+      "rw"(SurfaceHeight), "rw"(SurfacePitch), "rw"(Src0AddrX),
+      "rw"(Src0AddrY), "i"(BWHAL)
+      /*
+      : "+rw"(addressPayload) : "rw.u"(SurfaceBase), "rw.u"(SurfaceWidth),
+      "rw.u"(SurfaceHeight), "rw.u"(SurfacePitch), "rw.u"(Src0AddrX),
+      "rw.u"(Src0AddrY), "i"(BWHAL)
+      */
   );
 
-  return tmp;
+  return addressPayload;
 }
 
 #endif
