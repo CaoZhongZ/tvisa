@@ -746,14 +746,14 @@ template <int BlockWidth, int BlockHeight, int ArrayLength>
 struct AddressPayload {
   inline AddressPayload(
     void* SurfaceBase,
-    int SurfaceWidth, int SurfaceHeight,
-    int SurfacePitch, int Src0AddrX, int Src0AddrY
+    uint32_t SurfaceWidth, uint32_t SurfaceHeight,
+    uint32_t SurfacePitch, int Src0AddrX, int Src0AddrY
   ) {
     constexpr uint32_t BWHAL = (BlockWidth -1)
       | (BlockHeight -1) << 8 | ((ArrayLength -1) & 0xf) << 16;
 
     asm volatile ("{\n"
-        ".decl alias64 v_type=G type=q num_elts=8 align=GRF alias=<%0, 0>\n"
+        ".decl alias64 v_type=G type=uq num_elts=8 align=GRF alias=<%0, 0>\n"
         "mov (M1, 1) alias64(0, 0)<1> %1(0, 0)<0;1,0>\n"
         "add (M1, 1) %0(0, 2)<1> %2(0, 0)<0;1,0> -1:ud\n"
         "add (M1, 1) %0(0, 3)<1> %3(0, 0)<0;1,0> -1:ud\n"
@@ -791,7 +791,7 @@ struct AddressPayload {
 
   inline uint32_t& updateSurfaceBase(void *addr) {
     asm volatile ("{\n"
-        ".decl alias64 v_type=G type=q num_elts=8 align=GRF alias=<%0, 0>\n"
+        ".decl alias64 v_type=G type=uq num_elts=8 align=GRF alias=<%0, 0>\n"
         "mov (M1, 1) alias64(0, 0)<1> %1(0, 0)<0;1,0>\n"
         "}\n"
         : "+rw"(payloadReg_) : "rw"(addr)
@@ -805,14 +805,15 @@ private:
 template <int BlockWidth, int BlockHeight, int ArrayLength>
 static inline uint32_t packAddressPayload (
     void* SurfaceBase,
-    int SurfaceWidth, int SurfaceHeight, int SurfacePitch, int Src0AddrX, int Src0AddrY
+    uint32_t SurfaceWidth, uint32_t SurfaceHeight, uint32_t SurfacePitch,
+    int Src0AddrX, int Src0AddrY
 ) {
   uint32_t addressPayload;
   constexpr uint32_t BWHAL = (BlockWidth-1)
     | (BlockHeight-1) << 8 | ((ArrayLength -1) & 0xf) << 16;
 
   asm volatile ("{\n"
-      ".decl alias64 v_type=G type=q num_elts=8 align=GRF alias=<%0, 0>\n"
+      ".decl alias64 v_type=G type=uq num_elts=8 align=GRF alias=<%0, 0>\n"
       "mov (M1, 1) alias64(0, 0)<1> %1(0, 0)<0;1,0>\n"
       "add (M1, 1) %0(0, 2)<1> %2(0, 0)<0;1,0> -1:ud\n"
       "add (M1, 1) %0(0, 3)<1> %3(0, 0)<0;1,0> -1:ud\n"
@@ -836,10 +837,10 @@ static inline uint32_t packAddressPayload (
 
 static inline uint32_t& updateBaseAddress(uint32_t &addressPayload, void* base) {
   asm volatile ("{\n"
-      ".decl alias64 v_type=G type=q num_elts=8 align=GRF alias=<%0, 0>\n"
+      ".decl alias64 v_type=G type=uq num_elts=8 align=GRF alias=<%0, 0>\n"
       "mov (M1, 1) alias64(0, 0)<1> %1(0, 0)<0;1,0>\n"
       "}\n"
-      : "+rw"(addressPayload) : "rw"(addr)
+      : "+rw"(addressPayload) : "rw"(base)
   );
   return addressPayload;
 }
