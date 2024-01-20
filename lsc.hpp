@@ -744,6 +744,10 @@ template <> struct prefetch2D<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 
 template <int BlockWidth, int BlockHeight, int ArrayLength = 1>
 struct AddressPayload {
+  inline AddressPayload(const AddressPayload& payload) {
+    payloadReg_ = payload.getPayload();
+  }
+
   inline AddressPayload(
     void* SurfaceBase,
     uint32_t SurfaceWidth, uint32_t SurfaceHeight,
@@ -773,14 +777,8 @@ struct AddressPayload {
     );
   }
 
-  inline AddressPayload(const AddressPayload& payload) {
-    asm volatile ("mov (M1, 16) %0(0, 0)<1> %1(0,0)<1;1,0>\n"
-        : "=rw"(payloadReg_) : "rw" (payload.getPayload()));
-  }
-
   inline AddressPayload& operator = (const AddressPayload& payload) {
-    asm volatile ("mov (M1, 16) %0(0, 0)<1> %1(0,0)<1;1,0>\n"
-        : "=rw"(payloadReg_) : "rw" (payload.getPayload()));
+    payloadReg_ = payload.getPayload();
     return *this;
   }
 
@@ -818,6 +816,11 @@ struct AddressPayload {
     return *this;
   }
 
+  inline AddressPayload cloneAndUpdateSurfaceBase(void *addr) {
+    AddressPayload newPayload (*this);
+    return newPayload.upddateSurfaceBase(addr);
+  }
+
   inline AddressPayload& updateSrc0AddrX(int x_off) {
     asm volatile ("{\n"
         "mov (M1, 1) %0(0, 5)<1> %1(0, 0)<0;1,0>\n"
@@ -836,10 +839,6 @@ struct AddressPayload {
     return *this;
   }
 
-  // fork base and return new one
-  inline AddressPayload cloneUpdateSurfaceBase(void * addr) {
-    return updateSurfaceBase(addr);
-  }
 private:
   uint32_t payloadReg_;
 };
