@@ -588,7 +588,7 @@ template <> struct LscStore<4, 4, 32, CacheCtrl::L1UC_L3UC> {
 // Register allocation
 //  Only OpenCL vector type could gurantee IGC do contiguous allocation
 //
-template <int BlockWdith, int BlockHeight,
+template <int BlockWidth, int BlockHeight,
          DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
 struct Lsc2DLoad {
   template <typename T> static inline void run(
@@ -660,7 +660,7 @@ struct Lsc2DLoad<16, 4, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 };
 #endif
 
-template <int BlockWdith, int BlockHeight,
+template <int BlockWidth, int BlockHeight,
          DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
 struct Lsc2DStore {
   template <typename T> static inline void run(
@@ -779,59 +779,63 @@ struct AddressPayload {
 
   inline AddressPayload& operator = (const AddressPayload& payload) {
     payloadReg_ = payload.getPayload();
-    return payloadReg_;
+    return *this;
   }
 
   inline uint32_t& getPayload() {
     return payloadReg_;
   }
 
-  inline uint32_t& addSrc0AddrX(int offset) {
+  inline const uint32_t& getPayload() const {
+    return payloadReg_;
+  }
+
+  inline AddressPayload& addSrc0AddrX(int offset) {
     asm volatile (
         "add (M1, 1) %0(0, 5)<1> %0(0, 5)<0;1,0> %1(0,0)<0;1,0>\n"
         : "+rw"(payloadReg_) : "rw"(offset)
     );
-    return payloadReg_;
+    return *this;
   }
 
-  inline uint32_t& addSrc0AddrY(int offset) {
+  inline AddressPayload& addSrc0AddrY(int offset) {
     asm volatile (
         "add (M1, 1) %0(0, 6)<1> %0(0, 6)<0;1,0> %1(0,0)<0;1,0>\n"
         : "+rw"(payloadReg_) : "rw"(offset)
     );
-    return payloadReg_;
+    return *this;
   }
 
-  inline uint32_t& updateSurfaceBase(void *addr) {
+  inline AddressPayload& updateSurfaceBase(void *addr) {
     asm volatile ("{\n"
         ".decl alias64 v_type=G type=uq num_elts=8 align=GRF alias=<%0, 0>\n"
         "mov (M1, 1) alias64(0, 0)<1> %1(0, 0)<0;1,0>\n"
         "}\n"
         : "+rw"(payloadReg_) : "rw"(addr)
     );
-    return payloadReg_;
+    return *this;
   }
 
-  inline uint32_t& updateSrc0AddrX(int x_off) {
+  inline AddressPayload& updateSrc0AddrX(int x_off) {
     asm volatile ("{\n"
         "mov (M1, 1) %0(0, 5)<1> %1(0, 0)<0;1,0>\n"
         "}\n"
         : "=rw"(payloadReg_) : "rw"(x_off)
     );
-    return payloadReg_;
+    return *this;
   }
 
-  inline uint32_t& updateSrc0AddrY(int y_off) {
+  inline AddressPayload& updateSrc0AddrY(int y_off) {
     asm volatile ("{\n"
         "mov (M1, 1) %0(0, 6)<1> %1(0, 0)<0;1,0>\n"
         "}\n"
         : "=rw"(payloadReg_) : "rw"(y_off)
     );
-    return payloadReg_;
+    return *this;
   }
 
   // fork base and return new one
-  inline AddressPayload cloneUpdateSurfaceBase(void * addr) const {
+  inline AddressPayload cloneUpdateSurfaceBase(void * addr) {
     return updateSurfaceBase(addr);
   }
 private:
@@ -881,14 +885,17 @@ static inline uint32_t& updateBaseAddress(uint32_t &addressPayload, void* base) 
   return addressPayload;
 }
 
+#else
+template <int BlockWidth, int BlockHeight, int ArrayLength = 1>
+struct AddressPayload;
 #endif
 
 // more load/store instruction enumeration
 namespace {
 
-template <int BlockWdith, int BlockHeight,
+template <int BlockWidth, int BlockHeight,
          DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
-struct Lsc2DLoad {
+struct OptLsc2DLoad {
   template <typename T> static inline void run(
       sycl::vec<T, BlockHeight>& array,
       AddressPayload<BlockWidth, BlockHeight>& address);
@@ -898,57 +905,57 @@ struct Lsc2DLoad {
 //[(<P>)] {raw_sends|raw_sendsc}[_eot] <sfid> <numSrc0> <numSrc1> <numDst> (<exec_size>) <ExMsgDesc> <Desc> <Src0> <Src1> <Dst>
 
 template <>
-struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
+struct OptLsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(
     sycl::vec<T, 8>& array, AddressPayload<16, 8>& address
   ) {
     asm volatile ("\n"
-        "raw_sends.15.1.0.8 (M1, 1) 0x0:ud 0x2800403:ud %1 V0 %0\n"
+        "raw_sends.15.1.0.8 (M1, 1) 0x0:ud 0x2800403:ud %1.0 V0.0 %0.0\n"
         : "=rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array))
         : "rw"(address.getPayload()));
   }
 };
 
 template <>
-struct Lsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
+struct OptLsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(
     sycl::vec<T, 8>& array, AddressPayload<16, 8>& address
   ) {
     asm volatile ("\n"
-        "raw_sends.15.1.0.8 (M1, 1) 0x0:ud 0x2820403:ud %1 V0 %0\n"
+        "raw_sends.15.1.0.8 (M1, 1) 0x0:ud 0x2820403:ud %1.0 V0.0 %0.0\n"
         : "=rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array))
         : "rw"(address.getPayload()));
   }
 };
 
 template <>
-struct Lsc2DLoad<16, 4, DataShuffle::none, CacheCtrl::DEFAULT> {
+struct OptLsc2DLoad<16, 4, DataShuffle::none, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(
     sycl::vec<T, 8>& array, AddressPayload<16, 4>& address
   ) {
     asm volatile ("\n"
-        "raw_sends.15.1.0.4 (M1, 1) 0x0:ud 0x2400403:ud %1 V0 %0\n"
+        "raw_sends.15.1.0.4 (M1, 1) 0x0:ud 0x2400403:ud %1.0 V0.0 %0.0\n"
         : "=rw"(reinterpret_cast<typename sycl::vec<T, 4>::vector_t&>(array))
         : "rw"(address.getPayload()));
   }
 };
 
 template <>
-struct Lsc2DLoad<16, 4, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
+struct OptLsc2DLoad<16, 4, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(
     sycl::vec<T, 8>& array, AddressPayload<16, 4>& address
   ) {
     asm volatile ("\n"
-        "raw_sends.15.1.0.4 (M1, 1) 0x0:ud 0x2420403:ud %1 V0 %0\n"
+        "raw_sends.15.1.0.4 (M1, 1) 0x0:ud 0x2420403:ud %1.0 V0.0 %0.0\n"
         : "=rw"(reinterpret_cast<typename sycl::vec<T, 4>::vector_t&>(array))
         : "rw"(address.getPayload()));
   }
 };
 #endif
 
-template <int BlockWdith, int BlockHeight,
+template <int BlockWidth, int BlockHeight,
          DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
-struct Lsc2DStore {
+struct OptLsc2DStore {
   template <typename T> static inline void run(
       AddressPayload<BlockWidth, BlockHeight>& address,
       const sycl::vec<T, BlockHeight>& array);
@@ -957,52 +964,54 @@ struct Lsc2DStore {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 
 template <>
-struct Lsc2DStore<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
+struct OptLsc2DStore<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(
       AddressPayload<16, 8>& address, const sycl::vec<T, 8>& array
   ) {
     asm volatile ("\n"
-        "raw_sends.15.1.8.0 (M1, 1) 0x0:ud 0x2800407:ud %0 %1 V0\n" ::
+        "raw_sends.15.1.8.0 (M1, 1) 0x0:ud 0x2800407:ud %0.0 %1.0 V0.0\n" ::
         "rw"(address.getPayload()),
-        "rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array))
+        "rw"(reinterpret_cast<const typename sycl::vec<T, 8>::vector_t&>(array))
     );
   }
 };
 
 template <>
-struct Lsc2DStore<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
+struct OptLsc2DStore<16, 8, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
   template <typename T> static inline void run(
       AddressPayload<16, 8>& address, const sycl::vec<T, 8>& array
   ) {
     asm volatile ("\n"
-        "raw_sends.15.1.8.0 (M1, 1) 0x0:ud 0x2820407:ud %0 %1 V0\n" ::
+        "raw_sends.15.1.8.0 (M1, 1) 0x0:ud 0x2820407:ud %0.0 %1.0 V0.0\n" ::
         "rw"(address.getPayload()),
-        "rw"(reinterpret_cast<typename sycl::vec<T, 8>::vector_t&>(array))
-  }
-};
-
-template <>
-struct Lsc2DStore<16, 4, DataShuffle::none, CacheCtrl::DEFAULT> {
-  template <typename T> static inline void run(
-      AddressPayload<16, 4>& address, const sycl::vec<T, 4>& array
-  ) {
-    asm volatile ("\n"
-        "raw_sends.15.1.8.0 (M1, 1) 0x0:ud 0x2400407:ud %0 %1 V0\n" ::
-        "rw"(address.getPayload()),
-        "rw"(reinterpret_cast<typename sycl::vec<T, 4>::vector_t&>(array))
+        "rw"(reinterpret_cast<const typename sycl::vec<T, 8>::vector_t&>(array))
     );
   }
 };
 
 template <>
-struct Lsc2DStore<16, 4, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
+struct OptLsc2DStore<16, 4, DataShuffle::none, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(
       AddressPayload<16, 4>& address, const sycl::vec<T, 4>& array
   ) {
     asm volatile ("\n"
-        "raw_sends.15.1.8.0 (M1, 1) 0x0:ud 0x2420407:ud %0 %1 V0\n" ::
+        "raw_sends.15.1.8.0 (M1, 1) 0x0:ud 0x2400407:ud %0.0 %1.0 V0.0\n" ::
         "rw"(address.getPayload()),
-        "rw"(reinterpret_cast<typename sycl::vec<T, 4>::vector_t&>(array))
+        "rw"(reinterpret_cast<const typename sycl::vec<T, 4>::vector_t&>(array))
+    );
+  }
+};
+
+template <>
+struct OptLsc2DStore<16, 4, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
+  template <typename T> static inline void run(
+      AddressPayload<16, 4>& address, const sycl::vec<T, 4>& array
+  ) {
+    asm volatile ("\n"
+        "raw_sends.15.1.8.0 (M1, 1) 0x0:ud 0x2420407:ud %0.0 %1.0 V0.0\n" ::
+        "rw"(address.getPayload()),
+        "rw"(reinterpret_cast<const typename sycl::vec<T, 4>::vector_t&>(array))
+    );
   }
 };
 
@@ -1079,7 +1088,7 @@ static inline void lscLoad(
     sycl::vec<T, BlockHeight>& array,
     AddressPayload<BlockWidth, BlockHeight>& address
 ) {
-  Lsc2DLoad<BlockWidth, BlockHeight, Transpose, CTL>::template run<T>(
+  OptLsc2DLoad<BlockWidth, BlockHeight, Transpose, CTL>::template run<T>(
       array, address);
 }
 
@@ -1089,6 +1098,6 @@ static inline void lscStore(
     AddressPayload<BlockWidth, BlockHeight>& address,
     const sycl::vec<T, BlockHeight>& array
 ) {
-  Lsc2DStore<BlockWidth, BlockHeight, Transpose, CTL>::template run<T>(
+  OptLsc2DStore<BlockWidth, BlockHeight, Transpose, CTL>::template run<T>(
       address, array);
 }

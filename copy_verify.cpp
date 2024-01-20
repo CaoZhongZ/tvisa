@@ -48,7 +48,7 @@ struct tile_accumulate {
     int surface_width = surfaceW -1;
 
     AddressPayload<16, N> srcAddress(src, surfaceW, surfaceH, surfaceP, x_off, y_off);
-    auto dstAddress = srcAddress.cloneUpdateBase(dst);
+    auto dstAddress = srcAddress.cloneUpdateSurfaceBase(dst);
 
     sycl::vec<T, N> tmp0;
     sycl::vec<T, N> tmp1;
