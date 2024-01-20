@@ -776,6 +776,28 @@ struct AddressPayload {
   inline uint32_t& getPayload() {
     return payloadReg_;
   }
+
+  inline uint32_t& operator += (uint64_t offset) {
+    return payloadReg_;
+  }
+  
+  inline uint32_t& Add_Src0AddrX(uint32_t offset) {
+    return payloadReg_;
+  }
+
+  inline uint32_t& Add_Src0AddrY(uint32_t offset) {
+    return payloadReg_;
+  }
+
+  inline uint32_t& updateSurfaceBase(void *addr) {
+    asm volatile ("{\n"
+        ".decl alias64 v_type=G type=q num_elts=8 align=GRF alias=<%0, 0>\n"
+        "mov (M1, 1) alias64(0, 0)<1> %1(0, 0)<0;1,0>\n"
+        "}\n"
+        : "+rw"(payloadReg_) : "rw"(addr)
+    );
+    return payloadReg_;
+  }
 private:
   uint32_t payloadReg_;
 };
@@ -809,6 +831,16 @@ static inline uint32_t packAddressPayload (
       */
   );
 
+  return addressPayload;
+}
+
+static inline uint32_t& updateBaseAddress(uint32_t &addressPayload, void* base) {
+  asm volatile ("{\n"
+      ".decl alias64 v_type=G type=q num_elts=8 align=GRF alias=<%0, 0>\n"
+      "mov (M1, 1) alias64(0, 0)<1> %1(0, 0)<0;1,0>\n"
+      "}\n"
+      : "+rw"(addressPayload) : "rw"(addr)
+  );
   return addressPayload;
 }
 

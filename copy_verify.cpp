@@ -50,6 +50,8 @@ struct tile_accumulate {
     auto packed = AddressPayload<16,8,1>(
         src, surface_width, surface_height, pseudo_pitch, x_off, y_off);
 
+    packed.updateSurfaceBase(dst);
+
     lscStore<SG_SZ, CacheCtrl::L1UC_L3UC>(dst + index, packed.getPayload());
 #else
     dst[index] += src[index];
