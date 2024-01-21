@@ -752,6 +752,10 @@ struct OptLsc2DLoad {
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 //[(<P>)] {raw_sends|raw_sendsc}[_eot] <sfid> <numSrc0> <numSrc1> <numDst> (<exec_size>) <ExMsgDesc> <Desc> <Src0> <Src1> <Dst>
 
+//
+// XXX: Only 32-bit type with shape of Nx16 could match register region in exact.
+// Other shapes and format should resort to __Matrix interface.
+//
 template <>
 struct OptLsc2DLoad<16, 8, DataShuffle::none, CacheCtrl::DEFAULT> {
   template <typename T> static inline void run(
@@ -893,7 +897,7 @@ struct OptLsc2DStore<16, 4, DataShuffle::none, CacheCtrl::DEFAULT> {
       AddressPayload<16, 4>& address, const sycl::vec<T, 4>& array
   ) {
     asm volatile ("\n"
-        "raw_sends.15.1.8.0 (M1, 1) 0x0:ud 0x2400407:ud %0.0 %1.0 V0.0\n" ::
+        "raw_sends.15.1.4.0 (M1, 1) 0x0:ud 0x2400407:ud %0.0 %1.0 V0.0\n" ::
         "rw"(address.getPayload()),
         "rw"(reinterpret_cast<const typename sycl::vec<T, 4>::vector_t&>(array))
     );
@@ -906,7 +910,7 @@ struct OptLsc2DStore<16, 4, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
       AddressPayload<16, 4>& address, const sycl::vec<T, 4>& array
   ) {
     asm volatile ("\n"
-        "raw_sends.15.1.8.0 (M1, 1) 0x0:ud 0x2420407:ud %0.0 %1.0 V0.0\n" ::
+        "raw_sends.15.1.4.0 (M1, 1) 0x0:ud 0x2420407:ud %0.0 %1.0 V0.0\n" ::
         "rw"(address.getPayload()),
         "rw"(reinterpret_cast<const typename sycl::vec<T, 4>::vector_t&>(array))
     );
@@ -914,6 +918,15 @@ struct OptLsc2DStore<16, 4, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 };
 
 #endif
+
+template <int BlockWidth, int BlockHeight,
+         DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
+struct OptLsc2DLoad {
+  template <typename T> static inline void run(
+      __Matrix<T, BlockWidth, BlockHeight, Transpose>& M,
+      AddressPayload<BlockWidth, BlockHeight>& address) {
+  }
+};
 
 }
 
