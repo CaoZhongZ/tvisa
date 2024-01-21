@@ -41,11 +41,8 @@ struct tile_accumulate {
 
   void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> index) const {
 #if defined(__SYCL_DEVICE_ONLY__)
-    int pseudo_pitch = surfaceP -1;
     int x_off = 0;
     int y_off = index/SG_SZ * N;
-    int surface_height = surfaceH;
-    int surface_width = surfaceW -1;
 
     AddressPayload<16, N> srcAddress(src, surfaceW, surfaceH, surfaceP, x_off, y_off);
     AddressPayload<16, N> dstAddress(srcAddress);
@@ -110,18 +107,21 @@ int main(int argc, char *argv[]) {
     sycl::free(b_check, queue);
   });
 
-  fill_sequential((float *)b_host, 0., alloc_size / sizeof(float));
+  using t_type = sycl::half;
+  fill_sequential(
+      (t_type *)b_host, 0., alloc_size / sizeof(t_type)
+  );
 
   queue.memcpy(src, b_host, alloc_size);
   queue.wait();
 
   constexpr int ROW = 16;
 
-  auto nelems = alloc_size / sizeof(float);
+  auto nelems = alloc_size / sizeof(t_type);
 
-  queue.fill<float>(dst, 1, nelems);
+  queue.fill<t_type>(dst, 1, nelems);
 
-  auto block_sz = ROW * SG_SZ * sizeof(uint32_t);
+  auto block_sz = ROW * SG_SZ * sizeof(t_type);
   auto blocks = (alloc_size + block_sz - 1) / block_sz;
 
   //  ------------SG_SZ * 4-byte--------------
@@ -134,9 +134,9 @@ int main(int argc, char *argv[]) {
 
   queue.submit([&](sycl::handler &h) {
     h.parallel_for(sycl::range<1> { blocks * SG_SZ },
-        tile_accumulate<ROW, float>(
-          reinterpret_cast<float *>(dst),
-          reinterpret_cast<float *>(src),
+        tile_accumulate<ROW, t_type>(
+          reinterpret_cast<t_type *>(dst),
+          reinterpret_cast<t_type *>(src),
           surfaceH, surfaceW, surfaceP));
   });
 
@@ -146,16 +146,16 @@ int main(int argc, char *argv[]) {
   std::cout<<"----------------------------------"<<std::endl;
 
   for (int k = 0; k < ROW; ++ k) {
-    for (int i = 0; i < 64/sizeof(float); ++ i)
-      std::cout<<((float *)b_check)[k*64/sizeof(float) + i]<<", ";
+    for (int i = 0; i < 64/sizeof(t_type); ++ i)
+      std::cout<<((t_type *)b_check)[k*64/sizeof(t_type) + i]<<", ";
     std::cout<<std::endl;
   }
 
   std::cout<<"----------------------------------"<<std::endl;
 
   for (int k = ROW; k < 2 * ROW; ++ k) {
-    for (int i = 0; i < 64/sizeof(float); ++ i)
-      std::cout<<((float *)b_check)[k*64/sizeof(float) + i]<<", ";
+    for (int i = 0; i < 64/sizeof(t_type); ++ i)
+      std::cout<<((t_type *)b_check)[k*64/sizeof(t_type) + i]<<", ";
     std::cout<<std::endl;
   }
 }
