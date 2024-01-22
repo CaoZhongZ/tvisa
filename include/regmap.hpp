@@ -2,10 +2,6 @@
 
 #include <sycl/sycl.hpp>
 
-enum DataShuffle {
-  none, transpose, vnni
-};
-
 // TODO: move somewhere else
 template<int N> constexpr int Log2() {
   return Log2<N/2>() + 1;
@@ -23,66 +19,6 @@ template <int N, int L> constexpr int LowBound() {
   if constexpr (N < L) return L;
   else return N;
 }
-
-template <typename T, int Width, int Height,
-    DataShuffle Transpose, int ArraySize = 1, int SubGroupSize = 16>
-struct InnerLayout;
-
-template <typename T, int Width, int Height,
-         int ArraySize = 1, int SubGroupSize = 16>
-struct InnerLayout<T, Width, Height, DataShuffle::none, ArraySize, SubGroupSize> {
-private:
-  static constexpr int PaddedWidth = 1 << Log2<sizeof(T) * Width>();
-  static constexpr int RegSize = SubGroupSize * sizeof(int);
-public:
-  static constexpr int NumRegs = PaddedWidth * Height / RegSize * ArraySize;
-  static constexpr int N = NumRegs * sizeof(int)/sizeof(T);
-}
-
-template <typename T, int Width, int Height,
-         int ArraySize = 1, int SubGroupSize = 16>
-struct InnerLayout<T, Width, Height, DataShuffle::transpose, ArraySize, SubGroupSize> {
-private:
-  static constexpr int PaddedHeight = LowBound<1 << Log2<sizeof(T) * Height>(), 4 >();
-  static constexpr int RegSize = SubGroupSize * sizeof(int);
-public:
-  static constexpr int NumRegs = Width * PaddedHeight / RegSize * ArraySize;
-  static constexpr int N = NumRegs * sizeof(int)/sizeof(T);
-}
-
-template <typename T, int Width, int Height,
-         int ArraySize = 1, int SubGroupSize = 16>
-struct InnerLayout<T, Width, Height, DataShuffle::vnni, ArraySize, SubGroupSize> {
-private:
-  static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
-  static constexpr int PaddedHeight = (Height + ElemsPerLane -1) / ElemsPerLane;
-  static constexpr int PaddedWidth = 1 << Log2<sizeof(T) * Width>();
-  static constexpr int RegSize = SubGroupSize * sizeof(int);
-public:
-  static constexpr int NumRegs = PaddedWidth * PaddedHeight / RegSize * ArraySize;
-  static constexpr int N = NumRegs * sizeof(int)/sizeof(T);
-}
-
-//
-// memory region represents as regsiter image
-//
-template <typename T, int Width, int Height,
-         DataShuffle Transpose = DataShuffle::none,
-         int ArraySize = 1, int SubGroupSize = 16>
-struct __Matrix {
-  using layout = InnerLayout<T, Width, Height, Transpose, ArraySize, SubGroupSize>;
-  constexpr int NumRegs = layout::NumRegs;
-  constexpr int N = layout::N;
-
-  sycL::vec<T, N>::vector_t& getStorage() {
-    return reinterpret_cast<sycl::vec<T, N>::vector_t& >(registerImage_);
-  }
-  const sycL::vec<T, N>::vector_t& getStorage() const {
-    return reinterpret_cast<const sycl::vec<T, N>::vector_t& >(registerImage_);
-  }
-
-  sycl::vec<T, N> registerImage_;
-};
 
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 
@@ -234,3 +170,93 @@ static inline uint32_t& updateBaseAddress(uint32_t &addressPayload, void* base) 
 template <int BlockWidth, int BlockHeight, int ArrayLength = 1>
 struct AddressPayload;
 #endif
+
+template <typename T, int Width, int Height,
+    DataShuffle Transpose, int ArraySize = 1, int SubGroupSize = 16>
+struct InnerLayout;
+
+template <typename T, int Width, int Height, int ArraySize, int SubGroupSize>
+struct InnerLayout<T, Width, Height, DataShuffle::none, ArraySize, SubGroupSize> {
+private:
+  static constexpr int PaddedWidth = 1 << Log2<sizeof(T) * Width>();
+  static constexpr int RegSize = SubGroupSize * sizeof(int);
+public:
+  static constexpr int NumRegs = PaddedWidth * Height / RegSize * ArraySize;
+  static constexpr int N = NumRegs * sizeof(int)/sizeof(T);
+};
+
+template <typename T, int Width, int Height, int ArraySize, int SubGroupSize>
+struct InnerLayout<T, Width, Height, DataShuffle::transpose, ArraySize, SubGroupSize> {
+private:
+  static constexpr int PaddedHeight = LowBound<1 << Log2<sizeof(T) * Height>(), 4 >();
+  static constexpr int RegSize = SubGroupSize * sizeof(int);
+public:
+  static constexpr int NumRegs = Width * PaddedHeight / RegSize * ArraySize;
+  static constexpr int N = NumRegs * sizeof(int)/sizeof(T);
+};
+
+template <typename T, int Width, int Height, int ArraySize, int SubGroupSize>
+struct InnerLayout<T, Width, Height, DataShuffle::vnni, ArraySize, SubGroupSize> {
+private:
+  static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
+  static constexpr int PaddedHeight = (Height + NElemsPerLane -1) / NElemsPerLane;
+  static constexpr int PaddedWidth = 1 << Log2<sizeof(T) * Width>();
+  static constexpr int RegSize = SubGroupSize * sizeof(int);
+public:
+  static constexpr int NumRegs = PaddedWidth * PaddedHeight / RegSize * ArraySize;
+  static constexpr int N = NumRegs * sizeof(int)/sizeof(T);
+};
+
+//
+// memory region represents as regsiter image
+//
+template <typename T, int Width, int Height,
+         DataShuffle Transpose = DataShuffle::none,
+         int ArraySize = 1, int SubGroupSize = 16>
+struct __Matrix {
+  using layout = InnerLayout<T, Width, Height, Transpose, ArraySize, SubGroupSize>;
+  static constexpr int NumRegs = layout::NumRegs;
+  static constexpr int N = layout::N;
+
+  inline typename sycl::vec<T, N>::vector_t& getStorage() {
+    return reinterpret_cast<typename sycl::vec<T, N>::vector_t&>(registerImage_);
+  }
+  inline const typename sycl::vec<T, N>::vector_t& getStorage() const {
+    return reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(registerImage_);
+  }
+
+  __Matrix() = default;
+  __Matrix(const sycl::vec<T, N>& rh) : registerImage_(rh) {}
+  __Matrix(sycl::vec<T, N>&& rh) : registerImage_(std::move(rh)) {}
+  __Matrix(const __Matrix &rh) : registerImage_(rh.registerImage_) {}
+  __Matrix(__Matrix&& rh) : registerImage_(std::move(rh.registerImage_)) {}
+  inline __Matrix& operator = (__Matrix&& rh) {
+    registerImage_ = std::move(rh.registerImage_);
+    return *this;
+  }
+  inline __Matrix& operator = (const __Matrix& rh) {
+    registerImage_ = rh.registerImage_;
+    return *this;
+  }
+  inline __Matrix operator + (const __Matrix& m) {
+    return { registerImage_ + m.registerImage_ };
+  }
+  inline __Matrix operator - (const __Matrix& m) {
+    return { registerImage_ - m.registerImage_ };
+  }
+  inline __Matrix operator * (const __Matrix& m) {
+    return { registerImage_ * m.registerImage_ };
+  }
+  inline __Matrix operator / (const __Matrix& m) {
+    return { registerImage_ * m.registerImage_ };
+  }
+
+  template <CacheCtrl CTL>
+  inline __Matrix& load(const AddressPayload<Width, Height, ArraySize> &address);
+
+  template <CacheCtrl CTL>
+  inline __Matrix& store(const AddressPayload<Width, Height, ArraySize> &address);
+
+private:
+  sycl::vec<T, N> registerImage_;
+};

@@ -29,35 +29,44 @@ size_t parse_nelems(const std::string& nelems_string) {
 template <typename T>
 void fill_sequential(T *p, int rank, size_t nelems) {
   for (size_t i = 0; i < nelems; ++ i) {
-    p[i] = i + rank;
+    p[i] = i + rank / 1024.;
   }
 }
 
-template <int N, typename T>
+template <int W, int H, typename T>
 struct tile_accumulate {
-  tile_accumulate(T* dst, T* src, int surfaceH, int surfaceW, int surfaceP)
+  tile_accumulate(T* dst, T* src, int surfaceW, int surfaceH, int surfaceP)
     : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW), surfaceP(surfaceP)
   {}
 
   void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> index) const {
 #if defined(__SYCL_DEVICE_ONLY__)
-    int x_off = 0;
-    int y_off = index/SG_SZ * N;
+    auto grp_num = index / SG_SZ;
 
-    AddressPayload<16, N> srcAddress(src, surfaceW, surfaceH, surfaceP, x_off, y_off);
-    AddressPayload<16, N> dstAddress(srcAddress);
+    auto x_off = grp_num * 16;
+    auto y_off = 0;
+
+    AddressPayload<W, H> srcAddress(src, surfaceW, surfaceH, surfaceP, x_off, y_off);
+    AddressPayload<W, H> dstAddress(srcAddress);
 
     dstAddress.updateSurfaceBase(dst);
 
-    sycl::vec<T, N> tmp0;
-    sycl::vec<T, N> tmp1;
+    __Matrix<T, W, H> tmp0;
+    __Matrix<T, W, H> tmp1;
 
-    lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(tmp0, srcAddress);
-    lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(tmp1, dstAddress);
+    lscLoad<CacheCtrl::L1UC_L3UC>(tmp0, srcAddress);
+    lscLoad<CacheCtrl::L1UC_L3UC>(tmp1, dstAddress);
+
+    /*
+    tmp0.load(srcAddress);
+    tmp1.load(dstAddress);
+    */
 
     auto ret = tmp0 + tmp1;
+    lscStore<CacheCtrl::L1UC_L3UC>(dstAddress, ret);
 
-    lscStore<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(dstAddress, ret);
+    // ret.store(dstAddress);
+
 #else
     dst[index] += src[index];
 #endif
@@ -75,23 +84,31 @@ int main(int argc, char *argv[]) {
   cxxopts::Options opts("Copy", "Copy baseline for performance");
   opts.allow_unrecognised_options();
   opts.add_options()
-    ("s,size", "Size of test buffer",
-     cxxopts::value<std::string>()->default_value("32MB"))
+    ("p,pitch", "Pitch of the surface",
+     cxxopts::value<size_t>()->default_value("4096"))
+    ("s,surround", "Height of the outer surface",
+     cxxopts::value<size_t>()->default_value("4096"))
+    ("w,width", "Width of the surface",
+     cxxopts::value<int>()->default_value("1024"))
     ("h,height", "Height of the surface",
      cxxopts::value<int>()->default_value("1024"))
-    ("w,width", "Width of the surface",
-     cxxopts::value<int>()->default_value("64"))
-    ("p,pitch", "Pitch of the surface",
-     cxxopts::value<int>()->default_value("32"))
+    ("g,groups", "Number of subgroups",
+     cxxopts::value<size_t>()->default_value("1"))
     ;
 
   auto parsed_opts = opts.parse(argc, argv);
-  auto sz_string = parsed_opts["size"].as<std::string>();
 
-  auto alloc_size = parse_nelems(sz_string);
+  auto surfaceP = parsed_opts["pitch"].as<size_t>();
+  auto surround = parsed_opts["surround"].as<size_t>();
   auto surfaceH = parsed_opts["height"].as<int>();
   auto surfaceW = parsed_opts["width"].as<int>();
-  auto surfaceP = parsed_opts["pitch"].as<int>();
+
+  auto groups = parsed_opts["groups"].as<size_t>();
+
+  using t_type = sycl::half;
+
+  auto nelems = surfaceP * surround;
+  auto alloc_size = surfaceP * surround * sizeof(t_type);
 
   auto queue = currentQueue(0, 0);
 
@@ -107,55 +124,26 @@ int main(int argc, char *argv[]) {
     sycl::free(b_check, queue);
   });
 
-  using t_type = sycl::half;
   fill_sequential(
-      (t_type *)b_host, 0., alloc_size / sizeof(t_type)
+      (t_type *)b_host, 0., nelems
   );
 
   queue.memcpy(src, b_host, alloc_size);
   queue.wait();
 
-  constexpr int ROW = 16;
+  constexpr int Width = 16;
+  constexpr int Height = 8;
 
-  auto nelems = alloc_size / sizeof(t_type);
-
-  queue.fill<t_type>(dst, 1, nelems);
-
-  auto block_sz = ROW * SG_SZ * sizeof(t_type);
-  auto blocks = (alloc_size + block_sz - 1) / block_sz;
-
-  //  ------------SG_SZ * 4-byte--------------
-  //  |                                      |
-  // Row              Block                  |
-  //  |                                      |
-  //  ----------------------------------------
-
-  std::cout<<"Num. of block: "<<blocks<<std::endl;
+  queue.fill<t_type>(dst, 1., nelems);
 
   queue.submit([&](sycl::handler &h) {
-    h.parallel_for(sycl::range<1> { blocks * SG_SZ },
-        tile_accumulate<ROW, t_type>(
+    h.parallel_for(sycl::range<1> { groups * SG_SZ },
+        tile_accumulate<Width, Height, t_type>(
           reinterpret_cast<t_type *>(dst),
           reinterpret_cast<t_type *>(src),
-          surfaceH, surfaceW, surfaceP));
+          surfaceW, surfaceH, surfaceP));
   });
 
   queue.memcpy(b_check, dst, alloc_size);
   queue.wait();
-
-  std::cout<<"----------------------------------"<<std::endl;
-
-  for (int k = 0; k < ROW; ++ k) {
-    for (int i = 0; i < 64/sizeof(t_type); ++ i)
-      std::cout<<((t_type *)b_check)[k*64/sizeof(t_type) + i]<<", ";
-    std::cout<<std::endl;
-  }
-
-  std::cout<<"----------------------------------"<<std::endl;
-
-  for (int k = ROW; k < 2 * ROW; ++ k) {
-    for (int i = 0; i < 64/sizeof(t_type); ++ i)
-      std::cout<<((t_type *)b_check)[k*64/sizeof(t_type) + i]<<", ";
-    std::cout<<std::endl;
-  }
 }
