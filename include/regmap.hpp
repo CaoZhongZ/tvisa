@@ -74,6 +74,13 @@ struct __Matrix {
   constexpr int NumRegs = layout::NumRegs;
   constexpr int N = layout::N;
 
+  sycL::vec<T, N>::vector_t& getStorage() {
+    return reinterpret_cast<sycl::vec<T, N>::vector_t& >(registerImage_);
+  }
+  const sycL::vec<T, N>::vector_t& getStorage() const {
+    return reinterpret_cast<const sycl::vec<T, N>::vector_t& >(registerImage_);
+  }
+
   sycl::vec<T, N> registerImage_;
 };
 

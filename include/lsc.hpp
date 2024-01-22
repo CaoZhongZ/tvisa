@@ -7,6 +7,7 @@
 #define str(x) #x
 
 #include "regmap.hpp"
+#include "lsc_untyped_list.hpp"
 
 enum CacheCtrl {
   DEFAULT = 0,
@@ -920,11 +921,26 @@ struct OptLsc2DStore<16, 4, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 #endif
 
 template <int BlockWidth, int BlockHeight,
-         DataShuffle Transpose, CacheCtrl = CacheCtrl::DEFAULT>
+         DataShuffle Transpose, CacheCtrl Cache= CacheCtrl::DEFAULT>
 struct OptLsc2DLoad {
   template <typename T> static inline void run(
       __Matrix<T, BlockWidth, BlockHeight, Transpose>& M,
       AddressPayload<BlockWidth, BlockHeight>& address) {
+    constexpr auto NumRegs = M.NumRegs;
+    constexpr auto DataWidth = Log2<sizeof(T)>();
+    RawSendLoad<DataWidth, NumRegs, Transpose, Cache>::run(M.getStorage(), address);
+  }
+};
+
+template <int BlockWidth, int BlockHeight,
+         DataShuffle Transpose, CacheCtrl Cache= CacheCtrl::DEFAULT>
+struct OptLsc2DStore {
+  template <typename T> static inline void run(
+      AddressPayload<BlockWidth, BlockHeight>& address,
+      __Matrix<T, BlockWidth, BlockHeight, Transpose>& M) {
+    constexpr auto NumRegs = M.NumRegs;
+    constexpr auto DataWidth = Log2<sizeof(T)>();
+    RawSendStore<DataWidth, NumRegs, Transpose, Cache>::run(address, M.getStorage());
   }
 };
 
@@ -1011,4 +1027,29 @@ static inline void lscStore(
 ) {
   OptLsc2DStore<BlockWidth, BlockHeight, Transpose, CTL>::template run<T>(
       address, array);
+}
+
+//
+// lscLoad<CacheCtrl::L1UC_L3UC>(M, address);
+//
+template <CacheCtrl CTL= CacheCtrl::DEFAULT,
+    typename T, int BlockWidth, int BlockHeight, DataShuffle Transpose>
+static inline void lscLoad(
+    __Matrix<T, BlockWith, BlockHeight, Transpose>& M,
+    const AddressPayload<BlockWidth, BlockHeight>& address
+) {
+  constexpr auto NumRegs = M.NumRegs;
+  constexpr auto DataWidth = Log2<sizeof(T)>();
+  RawSendLoad<DataWidth, NumRegs, Transpose, Cache>::run(M.getStorage(), address);
+}
+
+template <CacheCtrl CTL= CacheCtrl::DEFAULT,
+    typename T, int BlockWidth, int BlockHeight, DataShuffle Transpose>
+static inline void lscStore(
+    AddressPayload<BlockWidth, BlockHeight>& address,
+    const __Matrix<T, BlockWith, BlockHeight, Transpose>& M
+) {
+  constexpr auto NumRegs = M.NumRegs;
+  constexpr auto DataWidth = Log2<sizeof(T)>();
+  RawSendStore<DataWidth, NumRegs, Transpose, Cache>::run(address, M.getStorage());
 }
