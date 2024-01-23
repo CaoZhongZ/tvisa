@@ -33,6 +33,17 @@ void fill_sequential(T *p, int rank, size_t nelems) {
   }
 }
 
+template <typename T>
+void show_tile(T* start, int W, int H, size_t pitch) {
+  auto* tile = reinterpret_cast<T (*)[pitch/sizeof(T)]>(start);
+  for (int h = 0; h < H; ++ h) {
+    for (int w = 0; w < W; ++ w) {
+      std::cout<<tile[h][w]<<", ";
+    }
+    std::cout<<std::endl;
+  }
+}
+
 template <int W, int H, typename T>
 struct tile_accumulate {
   tile_accumulate(T* dst, T* src, int surfaceW, int surfaceH, int surfaceP)
@@ -107,8 +118,8 @@ int main(int argc, char *argv[]) {
 
   using t_type = sycl::half;
 
-  auto nelems = surfaceP * surround;
-  auto alloc_size = surfaceP * surround * sizeof(t_type);
+  auto nelems = surfaceP * surround / sizeof(t_type);
+  auto alloc_size = surfaceP * surround;
 
   auto queue = currentQueue(0, 0);
 
@@ -146,4 +157,7 @@ int main(int argc, char *argv[]) {
 
   queue.memcpy(b_check, dst, alloc_size);
   queue.wait();
+
+  show_tile(b_host, Width, Height, surfaceP);
+  show_tile(b_check, Width, Height, surfaceP);
 }
