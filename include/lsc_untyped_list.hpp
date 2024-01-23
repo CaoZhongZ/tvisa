@@ -45,3 +45,41 @@ struct RawSendStore {
 #include "list_raw_stores.list"
 
 #endif
+
+template <int DataWidth, int VectorSize, int SubGroupSize, CacheCtrl = CacheCtrl::DEFAULT>
+struct LscLoad {
+  template <typename T> static inline void run(T& var, const void* addr);
+};
+
+template <int DataWidth, int VectorSize, int SubGroupSize, CacheCtrl = CacheCtrl::DEFAULT>
+struct LscStore {
+  template <typename T> static inline void run(void* addr, const T& var);
+};
+
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
+
+#define EnumerateLSCLoad(DataWidth, VectorSize, SubGroupSize, CacheCtrl, \
+    CacheStr, DtypeStr) \
+template <> struct LscLoad<DataWidth, VectorSize, SubGroupSize, CacheCtrl> { \
+  template <typename T> static inline void run(T& var, const void* addr) { \
+    asm volatile ("\n"  \
+        "lsc_load.ugm." str(CacheStr) " (M1, 16) %0:" str(DtypeStr) " flat[%1]:a64\n" \
+        : "=rw"(var) : "rw"(addr)); \
+  } \
+};
+
+#include "list_ugm_loads.list"
+
+#define EnumerateLSCStore(DataWidth, VectorSize, SubGroupSize, CacheCtrl, \
+    CacheStr, DtypeStr) \
+template <> struct LscStore<DataWidth, VectorSize, SubGroupSize, CacheCtrl> { \
+  template <typename T> static inline void run(void *addr, const T& var) {  \
+    asm volatile ("\n"  \
+        "lsc_store.ugm." str(CacheStr) " (M1, 16) flat[%0]:a64 %1:" str(DtypeStr) "\n" \
+        :: "rw"(addr), "rw"(var));  \
+  } \
+};
+
+#include "list_ugm_stores.list"
+
+#endif
