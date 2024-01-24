@@ -251,10 +251,10 @@ struct __Matrix {
     return { registerImage_ * m.registerImage_ };
   }
 
-  template <CacheCtrl CTL>
+  template <CacheCtrl CTL = CacheCtrl::DEFAULT>
   inline __Matrix& load(const AddressPayload<Width, Height, ArraySize> &address);
 
-  template <CacheCtrl CTL>
+  template <CacheCtrl CTL = CacheCtrl::DEFAULT>
   inline __Matrix& store(const AddressPayload<Width, Height, ArraySize> &address);
 
   // Review as re-shuffled tensor in logic view, need careful review here.

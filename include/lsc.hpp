@@ -486,9 +486,10 @@ inline __Matrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>&
 __Matrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>::load(
     const AddressPayload<Width, Height, ArraySize>& address
 ) {
-  constexpr auto NumRegs = this->NumRegs;
+  constexpr auto NumRegs = __Matrix::NumRegs;
   constexpr auto DataWidth = Log2<sizeof(T)>();
   RawSendLoad<DataWidth, NumRegs, Transpose, CTL>::run(this->getStorage(), address);
+  return *this;
 }
 
 template <typename T, int Width, int Height,
@@ -499,7 +500,8 @@ inline __Matrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>&
 __Matrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>::store(
     const AddressPayload<Width, Height, ArraySize>& address
 ) {
-  constexpr auto NumRegs = this->NumRegs;
+  constexpr auto NumRegs = __Matrix::NumRegs;
   constexpr auto DataWidth = Log2<sizeof(T)>();
   RawSendStore<DataWidth, NumRegs, Transpose, CTL>::run(address, this->getStorage());
+  return *this;
 }
