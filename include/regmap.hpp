@@ -257,6 +257,39 @@ struct __Matrix {
   template <CacheCtrl CTL>
   inline __Matrix& store(const AddressPayload<Width, Height, ArraySize> &address);
 
+  // Review as re-shuffled tensor in logic view, need careful review here.
+  template <DataShuffle reshuffle>
+  inline typename std::enable_if<Transpose == DataShuffle::vnni
+  && reshuffle == DataShuffle::none,
+    __Matrix<T, Width * 2, Height / 2, reshuffle, ArraySize, SubGroupSize>
+      >::type cast () {
+    return {registerImage_};
+  }
+
+  template <DataShuffle reshuffle>
+  inline typename std::enable_if<Transpose == DataShuffle::transpose
+  && reshuffle == DataShuffle::none,
+    __Matrix<T, Height, Width, reshuffle, ArraySize, SubGroupSize>
+      >::type cast() {
+    return {registerImage_};
+  }
+
+  template <DataShuffle reshuffle>
+  inline typename std::enable_if<Transpose == DataShuffle::none
+  && reshuffle == DataShuffle::vnni,
+    __Matrix<T, Width /2, Height * 2, reshuffle, ArraySize, SubGroupSize>
+      >::type cast() {
+    return {registerImage_};
+  }
+
+  template <DataShuffle reshuffle>
+  inline typename std::enable_if<Transpose == DataShuffle::none
+  && reshuffle == DataShuffle::transpose,
+    __Matrix<T, Height, Width, DataShuffle::transpose, ArraySize, SubGroupSize>
+      >::type cast() {
+    return {registerImage_};
+  }
+
 private:
   sycl::vec<T, N> registerImage_;
 };
