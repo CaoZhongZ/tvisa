@@ -24,10 +24,6 @@ template <int N, int L> constexpr int LowBound() {
 
 template <int BlockWidth, int BlockHeight, int ArrayLength = 1>
 struct AddressPayload {
-  inline AddressPayload(const AddressPayload& payload) {
-    payloadReg_ = payload.getPayload();
-  }
-
   inline AddressPayload(
     void* SurfaceBase,
     uint32_t SurfaceWidth, uint32_t SurfaceHeight,
@@ -57,8 +53,31 @@ struct AddressPayload {
     );
   }
 
-  inline AddressPayload& operator = (const AddressPayload& payload) {
+  template <int NewWidth, int NewHeight, int NewArrayLength>
+  inline AddressPayload(
+      const AddressPayload<NewWidth, NewHeight, NewArrayLength>& payload) {
     payloadReg_ = payload.getPayload();
+
+    if constexpr (NewWidth != BlockWidth || NewHeight != BlockHeight
+        || NewArrayLength != ArrayLength) {
+      constexpr uint32_t BWHAL = (NewWidth -1)
+        | (NewHeight -1) << 8 | ((NewArrayLength -1) & 0xf) << 16;
+      asm volatile ("mov (M1, 1) %0(0, 7)<1> %1\n" : "=rw"(payloadReg_) : "i"(BWHAL));
+    }
+  }
+
+  template <int NewWidth, int NewHeight, int NewArrayLength>
+  inline AddressPayload& operator = (
+      const AddressPayload<NewWidth, NewHeight, NewArrayLength>& payload) {
+    payloadReg_ = payload.getPayload();
+
+    if constexpr (NewWidth != BlockWidth || NewHeight != BlockHeight
+        || NewArrayLength != ArrayLength) {
+      constexpr uint32_t BWHAL = (NewWidth -1)
+        | (NewHeight -1) << 8 | ((NewArrayLength -1) & 0xf) << 16;
+      asm volatile ("mov (M1, 1) %0(0, 7)<1> %7\n" : "=rw"(payloadReg_) : "i"(BWHAL));
+    }
+
     return *this;
   }
 
@@ -180,8 +199,9 @@ struct InnerLayout<T, Width, Height, DataShuffle::none, ArraySize, SubGroupSize>
 private:
   static constexpr int PaddedWidth = 1 << Log2<sizeof(T) * Width>();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
+  static constexpr int AllocSize = PaddedWidth * Height * ArraySize;
 public:
-  static constexpr int NumRegs = PaddedWidth * Height / RegSize * ArraySize;
+  static constexpr int NumRegs = (AllocSize + RegSize -1) / RegSize;
   static constexpr int N = NumRegs * sizeof(int)/sizeof(T);
 };
 
@@ -190,8 +210,9 @@ struct InnerLayout<T, Width, Height, DataShuffle::transpose, ArraySize, SubGroup
 private:
   static constexpr int PaddedHeight = LowBound<1 << Log2<sizeof(T) * Height>(), 4 >();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
+  static constexpr int AllocSize = Width * PaddedHeight * ArraySize;
 public:
-  static constexpr int NumRegs = Width * PaddedHeight / RegSize * ArraySize;
+  static constexpr int NumRegs = (AllocSize + RegSize -1)/ RegSize;
   static constexpr int N = NumRegs * sizeof(int)/sizeof(T);
 };
 
@@ -202,8 +223,9 @@ private:
   static constexpr int PaddedHeight = (Height + NElemsPerLane -1) / NElemsPerLane;
   static constexpr int PaddedWidth = 1 << Log2<sizeof(T) * Width>();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
+  static constexpr int AllocSize = PaddedWidth * PaddedHeight * ArraySize;
 public:
-  static constexpr int NumRegs = PaddedWidth * PaddedHeight / RegSize * ArraySize;
+  static constexpr int NumRegs = (AllocSize + RegSize -1) / RegSize;
   static constexpr int N = NumRegs * sizeof(int)/sizeof(T);
 };
 
@@ -230,6 +252,7 @@ struct __Matrix {
   __Matrix(sycl::vec<T, N>&& rh) : registerImage_(std::move(rh)) {}
   __Matrix(const __Matrix &rh) : registerImage_(rh.registerImage_) {}
   __Matrix(__Matrix&& rh) : registerImage_(std::move(rh.registerImage_)) {}
+
   inline __Matrix& operator = (__Matrix&& rh) {
     registerImage_ = std::move(rh.registerImage_);
     return *this;
@@ -288,6 +311,14 @@ struct __Matrix {
     __Matrix<T, Height, Width, DataShuffle::transpose, ArraySize, SubGroupSize>
       >::type cast() {
     return {registerImage_};
+  }
+
+  //
+  // XXX: performance problem for SIMD16/sycl::half when compiler generate 
+  // two instructions for single register operation.
+  //
+  inline void zero() {
+    registerImage_ =0;
   }
 
 private:

@@ -44,9 +44,9 @@ void show_tile(T* start, int W, int H, size_t pitch) {
   }
 }
 
-template <int W, int H, typename T>
+template <typename T>
 struct tile_accumulate {
-  tile_accumulate(T* dst, T* src, int surfaceW, int surfaceH, int surfaceP)
+  tile_accumulate(T* dst, sycl::half* src, int surfaceW, int surfaceH, int surfaceP)
     : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW), surfaceP(surfaceP)
   {}
 
@@ -57,22 +57,23 @@ struct tile_accumulate {
     auto x_off = grp_num * 16;
     auto y_off = 0;
 
-    AddressPayload<W, H> srcAddress(src, surfaceW, surfaceH, surfaceP, x_off, y_off);
-    AddressPayload<W, H> dstAddress(srcAddress);
+    AddressPayload<16, 8> srcAddress(src,
+        surfaceW, surfaceH, surfaceP, x_off, y_off);
 
+    AddressPayload<16, 16> dstAddress(srcAddress);
     dstAddress.updateSurfaceBase(dst);
 
-    __Matrix<T, W, H> tmp0;
-    __Matrix<T, W, H> tmp1;
-
-    // lscLoad<CacheCtrl::L1UC_L3UC>(tmp0, srcAddress);
-    // lscLoad<CacheCtrl::L1UC_L3UC>(tmp1, dstAddress);
+    __Matrix<sycl::half, 16, 8> tmp0;
+    __Matrix<sycl::half, 16, 16, DataShuffle::vnni> tmp1;
 
     tmp0.load(srcAddress);
-    tmp1.load(dstAddress);
+    tmp1.load(srcAddress);
 
-    auto ret = tmp0 + tmp1;
-    // lscStore<CacheCtrl::L1UC_L3UC>(dstAddress, ret);
+    __Matrix<T, 16, 8> ret;
+    ret.zero();
+
+    dpas(ret, ret, tmp0, tmp1);
+
     ret.store(dstAddress);
 
 #else
@@ -81,7 +82,7 @@ struct tile_accumulate {
   }
 
 private:
-  T* src;
+  sycl::half* src;
   T* dst;
   int surfaceH;
   int surfaceW;
@@ -146,7 +147,7 @@ int main(int argc, char *argv[]) {
 
   queue.submit([&](sycl::handler &h) {
     h.parallel_for(sycl::range<1> { groups * SG_SZ },
-        tile_accumulate<Width, Height, t_type>(
+        tile_accumulate<t_type>(
           reinterpret_cast<t_type *>(dst),
           reinterpret_cast<t_type *>(src),
           surfaceW, surfaceH, surfaceP));

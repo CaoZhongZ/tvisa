@@ -10,58 +10,144 @@ void dp4a(uint32_t& dst, uint32_t& accum, uint32_t a, uint32_t b) {
 }
 #endif
 
-// TODO: define matrix shape out on sycl::vec<T, N>::vector_t
-enum DataType {
-  HF,
+namespace {
+struct systolic_config {
+  static constexpr int Depth = 8;
+  static constexpr int Width = 16;
 };
 
-namespace {
-//
-// let's try strong type, reordered shape for low-level type
-//
+template <
+  typename OT,
+  typename AccumT,
+  typename IT1,
+  typename IT2 = IT1,
+  typename config = systolic_config
+> struct Dpas {
+  static constexpr int Depth = config::Depth;
+  static constexpr int Width = config::Width;
 
-template <typename OutputType, typename AccumType, typename InputType>
-struct Dpas {
-  template <int Row_C, int Row_A, int Row_B, int STEP> static inline void run(
-      sycl::vec<OutputType, Raw_A>& C,
-      sycl::vec<AccumType, Raw_A>& Accum,
-      sycl::vec<InputType, Row_A>& A,
-      sycl::vec<InputType, Row_B>& B
+  static constexpr int OpsPerChan = sizeof(int) / sizeof(IT2);
+  static constexpr int Src1ElemsPerChan = sizeof(int) / OpsPerChan;
+
+  static constexpr int K = Depth * OpsPerChan;
+  static constexpr int N = Width * Src1ElemsPerChan;
+
+  template <int M> static inline void run(
+      __Matrix<OT, M, N, DataShuffle::none>& C,   /* dst */
+      __Matrix<AccumT, M, N, DataShuffle::none>& Accum, /* src0 */
+      __Matrix<IT1, K, M, DataShuffle::none>& A,  /* src2 */
+      __Matrix<IT2, N, K, DataShuffle::vnni>& B   /* src1 */
   );
 };
 
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 
-template <> struct Dpas<float, float, sycl::half> {
-  // C = ACC + A * B
-  template <> static inline void run<8, 4, 16, 8>(
-      sycl::vec<float, 8>::vector_t& C,   /* 8 x 16 */
-      sycl::vec<float, 8>::vector_t& ACC,  /* 8 x 16 */
-      sycl::vec<sycl::half, 4>::vector_t& A, /* 8 x 16 */
-      sycl::vec<sycl::half, 16>::vector_t& B, /* 16 x 16 */
-  ) {
-    asm volatile ("\n"
-        "dpas.hf.hf.8.8 (M1, 16) %0.0 %1.0 %3.0 %2(0, 0)\n"
-        : "=rw"(C), "+rw"(ACC) : "rw"(A), "rw"(B)
-    );
+// cover half, PVC
+template <typename OT, typename AccumT>
+struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
+  static constexpr int Depth = systolic_config::Depth;
+  static constexpr int Width = systolic_config::Width;
+
+  static constexpr int OpsPerChan = sizeof(int) / sizeof(sycl::half); /* 2 */
+  static constexpr int Src1ElemsPerChan = 1;
+
+  static constexpr int K = Depth * OpsPerChan; /* 16 */
+  static constexpr int N = Width * Src1ElemsPerChan; /* 16 */
+
+  template <int M> static inline void run(
+      __Matrix<OT, N, M, DataShuffle::none>&,
+      __Matrix<AccumT, N, M, DataShuffle::none>&,
+      __Matrix<sycl::half, K, M, DataShuffle::none>&,
+      __Matrix<sycl::half, N, K, DataShuffle::vnni>&
+  );
+
+#define GenRepeat(M)  \
+  template <> static inline void run<M>(  \
+      __Matrix<OT, N, M, DataShuffle::none>& C,   /* dst */  \
+      __Matrix<AccumT, N, M, DataShuffle::none>& Accum, /* src0 */ \
+      __Matrix<sycl::half, K, M, DataShuffle::none>& A,  /* src2 */ \
+      __Matrix<sycl::half, N, K, DataShuffle::vnni>& B   /* src1 */ \
+  ) { \
+    asm volatile ("\n"  \
+        "dpas.hf.hf.8." str(M) " (M1, 16) %0.0 %1.0 %3.0 %2(0, 0)\n"  \
+        : "=rw"(C.getStorage()): "rw"(Accum.getStorage()),  \
+        "rw"(A.getStorage()), "rw"(B.getStorage())  \
+    );  \
   }
+
+  GenRepeat(1);
+  GenRepeat(2);
+  GenRepeat(3);
+  GenRepeat(4);
+  // GenRepeat(5);
+  // GenRepeat(6);
+  GenRepeat(7);
+  GenRepeat(8);
+#undef GenRepeat
 };
 
-template <> struct Dpas<sycl::half, float, sycl::half> {
-  // C = ACC + A * B
-  template <> static inline void run<8, 4, 16, 8>(
-      sycl::vec<sycl::half, 8>::vector_t& C,   /* 8 x 16, layout??? */
-      sycl::vec<sycl::half, 8>::vector_t& ACC,  /* 8 x 16 */
-      sycl::vec<sycl::half, 4>::vector_t& A, /* 8 x 16 */
-      sycl::vec<sycl::half, 16>::vector_t& B, /* 16 x 16 */
-  ) {
-    asm volatile ("\n"
-        "dpas.hf.hf.8.8 (M1, 16) %0.0 %1.0 %3.0 %2(0, 0)\n"
-        : "=rw"(C), "+rw"(ACC) : "rw"(A), "rw"(B)
-    );
-  }
-};
+// using bf16 = sycl::ext::oneapi::bfloat16;
+//
+// // cover brain-float, PVC
+// template <typename OT, typename AccumT>
+// struct Dpas<OT, AccumT, bf16, bf16, systolic_config> {
+//   static constexpr int Depth = systolic_config::Depth;
+//   static constexpr int Width = systolic_config::Width;
+//
+//   static constexpr int OpsPerChan = sizeof(int) / sizeof(sycl::half); /* 2 */
+//   static constexpr int Src1ElemsPerChan = 1;
+//
+//   static constexpr int K = Depth * OpsPerChan; /* 16 */
+//   static constexpr int N = Width * Src1ElemsPerChan; /* 16 */
+//
+//   template <int M> static inline void run(
+//       __Matrix<OT, M, N, DataShuffle::none>&,
+//       __Matrix<AccumT, M, N, DataShuffle::none>&,
+//       __Matrix<bf16, K, M, DataShuffle::none>&,
+//       __Matrix<bf16, N, K, DataShuffle::vnni>&
+//   );
+//
+// #define GenRepeat(M)  \
+//   template <> static inline void run<M>(  \
+//       __Matrix<OT, M, N, DataShuffle::none>& C,   /* dst */  \
+//       __Matrix<AccumT, M, N, DataShuffle::none>& Accum, /* src0 */ \
+//       __Matrix<bf16, K, M, DataShuffle::none>& A,  /* src2 */ \
+//       __Matrix<bf16, N, K, DataShuffle::vnni>& B   /* src1 */ \
+//   ) { \
+//     asm volatile ("\n"  \
+//         "dpas.bf.bf.8." str(M) " (M1, 16) %0.0 %1.0 %3.0 %2(0, 0)\n"  \
+//         : "=rw"(C.getStorage()): "rw"(Accum.getStorage())  \
+//         "rw"(A.getStorage()), "rw"(B.getStorage())  \
+//     );  \
+//   }
+//
+//   GenRepeat(1);
+//   GenRepeat(2);
+//   GenRepeat(3);
+//   GenRepeat(4);
+//   // GenRepeat(5);
+//   // GenRepeat(6);
+//   GenRepeat(7);
+//   GenRepeat(8);
+// #undef GenRepeat
+// };
+
 
 #endif
+
+template <
+  int M, int K, int N,
+  typename OT,
+  typename AccumT,
+  typename IT1,
+  typename IT2,
+  typename config = systolic_config>
+static inline void dpas(
+    __Matrix<OT, N, M>& D, __Matrix<AccumT, N, M>& C,
+    __Matrix<IT1, K, M>& A, __Matrix<IT2, N, K, DataShuffle::vnni>& B
+) {
+  // TODO: check accepted parameters with static assert;
+  Dpas<OT, AccumT, IT1, IT2, systolic_config>::template run<M>(D, C, A, B);
+}
 
 }
