@@ -26,7 +26,7 @@ LINKTARGET=-Xsycl-target-backend=spir64_gen "-device $(ENABLE_AOT)"
 OFFLOAD=sycl-spir64_gen-unknown-unknown
 endif
 
-V=-v
+V=
 CXXFLAGS=-std=c++17 $(OPT_FLAGS) -Wall -Wno-deprecated-declarations -Wno-unused-variable -Wno-vla-cxx-extension -Iinclude
 SYCLFLAGS=-fsycl -fsycl-id-queries-fit-in-int -fsycl-default-sub-group-size=16 -D__SYCL_INTERNAL_API -fsycl-targets=$(TARGET)
 LINKFLAGS=$(OPT_FLAGS) -fsycl -fsycl-max-parallel-link-jobs=8 -fsycl-targets=$(TARGET) $(LINKTARGET)

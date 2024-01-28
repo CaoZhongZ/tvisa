@@ -24,6 +24,7 @@ template <int N, int L> constexpr int LowBound() {
 
 template <int BlockWidth, int BlockHeight, int ArrayLength = 1>
 struct AddressPayload {
+  inline AddressPayload() = default;
   inline AddressPayload(
     void* SurfaceBase,
     uint32_t SurfaceWidth, uint32_t SurfaceHeight,
@@ -42,7 +43,7 @@ struct AddressPayload {
         "mov (M1, 1) %0(0, 6)<1> %6(0, 0)<0;1,0> \n"
         "mov (M1, 1) %0(0, 7)<1> %7\n"
         "}\n"
-        : "+rw"(payloadReg_) : "rw"(SurfaceBase), "rw"(SurfaceWidth),
+        : "=rw"(payloadReg_) : "rw"(SurfaceBase), "rw"(SurfaceWidth),
         "rw"(SurfaceHeight), "rw"(SurfacePitch), "rw"(Src0AddrX),
         "rw"(Src0AddrY), "i"(BWHAL)
         /*
@@ -53,31 +54,28 @@ struct AddressPayload {
     );
   }
 
-  template <int NewWidth, int NewHeight, int NewArrayLength>
+  template <int OldWidth, int OldHeight, int OldArrayLength>
   inline AddressPayload(
-      const AddressPayload<NewWidth, NewHeight, NewArrayLength>& payload) {
-    payloadReg_ = payload.getPayload();
-
-    if constexpr (NewWidth != BlockWidth || NewHeight != BlockHeight
-        || NewArrayLength != ArrayLength) {
-      constexpr uint32_t BWHAL = (NewWidth -1)
-        | (NewHeight -1) << 8 | ((NewArrayLength -1) & 0xf) << 16;
-      asm volatile ("mov (M1, 1) %0(0, 7)<1> %1\n" : "=rw"(payloadReg_) : "i"(BWHAL));
+      const AddressPayload<OldWidth, OldHeight, OldArrayLength>& payload) :
+    payloadReg_(payload.getPayload()) {
+    if constexpr (OldWidth != BlockWidth || OldHeight != BlockHeight
+        || OldArrayLength != ArrayLength) {
+      constexpr uint32_t BWHAL = (BlockWidth -1)
+        | (BlockHeight -1) << 8 | ((ArrayLength -1) & 0xf) << 16;
+      asm volatile ("mov (M1,1) %0(0,7)<1> %1\n" : "=rw"(payloadReg_) : "i"(BWHAL));
     }
   }
 
-  template <int NewWidth, int NewHeight, int NewArrayLength>
+  template <int OldWidth, int OldHeight, int OldArrayLength>
   inline AddressPayload& operator = (
-      const AddressPayload<NewWidth, NewHeight, NewArrayLength>& payload) {
+      const AddressPayload<OldWidth, OldHeight, OldArrayLength>& payload) {
     payloadReg_ = payload.getPayload();
-
-    if constexpr (NewWidth != BlockWidth || NewHeight != BlockHeight
-        || NewArrayLength != ArrayLength) {
-      constexpr uint32_t BWHAL = (NewWidth -1)
-        | (NewHeight -1) << 8 | ((NewArrayLength -1) & 0xf) << 16;
-      asm volatile ("mov (M1, 1) %0(0, 7)<1> %7\n" : "=rw"(payloadReg_) : "i"(BWHAL));
+    if constexpr (OldWidth != BlockWidth || OldHeight != BlockHeight
+        || OldArrayLength != ArrayLength) {
+      constexpr uint32_t BWHAL = (BlockWidth -1)
+        | (BlockHeight -1) << 8 | ((ArrayLength -1) & 0xf) << 16;
+      asm volatile ("mov (M1, 1) %0(0,7)<1> %1\n": "=rw"(payloadReg_): "i"(BWHAL));
     }
-
     return *this;
   }
 
@@ -108,7 +106,8 @@ struct AddressPayload {
   inline AddressPayload& updateSurfaceBase(void *addr) {
     asm volatile ("{\n"
         ".decl alias64 v_type=G type=uq num_elts=8 align=GRF alias=<%0, 0>\n"
-        "mov (M1, 1) alias64(0, 0)<1> %1(0, 0)<0;1,0>\n"
+        "mov (M1,1) alias64(0, 0)<1> %1(0, 0)<0;1,0>\n"
+        "mov (M1,16) %0(0,0)<1> %0(0,0)<1;1,0>\n"
         "}\n"
         : "+rw"(payloadReg_) : "rw"(addr)
     );
@@ -179,6 +178,7 @@ static inline uint32_t& updateBaseAddress(uint32_t &addressPayload, void* base) 
   asm volatile ("{\n"
       ".decl alias64 v_type=G type=uq num_elts=8 align=GRF alias=<%0, 0>\n"
       "mov (M1, 1) alias64(0, 0)<1> %1(0, 0)<0;1,0>\n"
+      "mov (M1, 16) %0(0, 0)<1> %0(0, 0)<1;1,0>\n"
       "}\n"
       : "+rw"(addressPayload) : "rw"(base)
   );
