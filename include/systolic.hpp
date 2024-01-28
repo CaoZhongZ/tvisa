@@ -68,10 +68,11 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
       __Matrix<sycl::half, K, M, DataShuffle::none>& A,  /* src2 */ \
       __Matrix<sycl::half, N, K, DataShuffle::vnni>& B   /* src1 */ \
   ) { \
-    asm volatile ("\n"  \
+    asm volatile ("{\n"  \
         "dpas.hf.hf.8." str(M) " (M1, 16) %0.0 %1.0 %3.0 %2(0, 0)\n"  \
+        "}\n" \
         : "=rw"(C.getStorage()): "rw"(Accum.getStorage()),  \
-        "rw"(A.getStorage()), "rw"(B.getStorage())  \
+        "rw"(A.getRawStorage()), "rw"(B.getRawStorage())  \
     );  \
   }
 

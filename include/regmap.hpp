@@ -74,7 +74,7 @@ struct AddressPayload {
         || OldArrayLength != ArrayLength) {
       constexpr uint32_t BWHAL = (BlockWidth -1)
         | (BlockHeight -1) << 8 | ((ArrayLength -1) & 0xf) << 16;
-      asm volatile ("mov (M1, 1) %0(0,7)<1> %1\n": "=rw"(payloadReg_): "i"(BWHAL));
+      asm volatile ("mov (M1,1) %0(0,7)<1> %1\n": "=rw"(payloadReg_): "i"(BWHAL));
     }
     return *this;
   }
@@ -120,18 +120,14 @@ struct AddressPayload {
   }
 
   inline AddressPayload& updateSrc0AddrX(int x_off) {
-    asm volatile ("{\n"
-        "mov (M1, 1) %0(0, 5)<1> %1(0, 0)<0;1,0>\n"
-        "}\n"
+    asm volatile ("mov (M1, 1) %0(0, 5)<1> %1(0, 0)<0;1,0>\n"
         : "=rw"(payloadReg_) : "rw"(x_off)
     );
     return *this;
   }
 
   inline AddressPayload& updateSrc0AddrY(int y_off) {
-    asm volatile ("{\n"
-        "mov (M1, 1) %0(0, 6)<1> %1(0, 0)<0;1,0>\n"
-        "}\n"
+    asm volatile ("mov (M1, 1) %0(0, 6)<1> %1(0, 0)<0;1,0>\n"
         : "=rw"(payloadReg_) : "rw"(y_off)
     );
     return *this;
@@ -240,11 +236,20 @@ struct __Matrix {
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
 
+  using rawType = sycl::vec<uint32_t, sizeof(sycl::vec<T, N>)/sizeof(uint32_t)>;
+
   inline typename sycl::vec<T, N>::vector_t& getStorage() {
     return reinterpret_cast<typename sycl::vec<T, N>::vector_t&>(registerImage_);
   }
   inline const typename sycl::vec<T, N>::vector_t& getStorage() const {
     return reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(registerImage_);
+  }
+
+  inline typename rawType::vector_t& getRawStorage() {
+    return reinterpret_cast<typename rawType::vector_t&>(registerImage_);
+  }
+  inline const typename rawType::vector_t& getRawStorage() const {
+    return reinterpret_cast<const typename rawType::vector_t&>(registerImage_);
   }
 
   __Matrix() = default;
