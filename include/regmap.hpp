@@ -246,12 +246,14 @@ struct __Matrix {
     return reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(registerImage_);
   }
 
+  /* XXX: Generate unecessary copy, WTF???
   inline typename rawType::vector_t& getRawStorage() {
     return reinterpret_cast<typename rawType::vector_t&>(registerImage_);
   }
   inline const typename rawType::vector_t& getRawStorage() const {
     return reinterpret_cast<const typename rawType::vector_t&>(registerImage_);
   }
+  */
 
   __Matrix() = default;
   __Matrix(const sycl::vec<T, N>& rh) : registerImage_(rh) {}
@@ -320,7 +322,7 @@ struct __Matrix {
   }
 
   //
-  // XXX: performance problem for SIMD16/sycl::half when compiler generate 
+  // XXX: performance problem for SIMD16/sycl::half when compiler generate
   // two instructions for single register operation.
   //
   inline void zero() {
@@ -329,4 +331,110 @@ struct __Matrix {
 
 private:
   sycl::vec<T, N> registerImage_;
+};
+
+// __RawMatrix for workaround IGC dpas type requirement if alias doesn't work
+template <typename T, int Width, int Height,
+         DataShuffle Transpose = DataShuffle::none,
+         int ArraySize = 1, int SubGroupSize = 16>
+struct __RawMatrix {
+  using layout = InnerLayout<T, Width, Height, Transpose, ArraySize, SubGroupSize>;
+  static constexpr int NumRegs = layout::NumRegs;
+  static constexpr int N = layout::N;
+
+  static_assert(NumRegs == sizeof(sycl::vec<T, N>)/sizeof(uint32_t));
+  using rawType = sycl::vec<uint32_t, sizeof(sycl::vec<T, N>)/sizeof(uint32_t)>;
+
+  /* XXX: Generate unecessary copy, WTF???
+  inline typename sycl::vec<T, N>::vector_t& getStorage() {
+    return reinterpret_cast<typename sycl::vec<T, N>::vector_t&>(registerImage_);
+  }
+  inline const typename sycl::vec<T, N>::vector_t& getStorage() const {
+    return reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(registerImage_);
+  }
+  */
+
+  inline typename rawType::vector_t& getStorage() {
+    return reinterpret_cast<typename rawType::vector_t&>(registerImage_);
+  }
+  inline const typename rawType::vector_t& getStorage() const {
+    return reinterpret_cast<const typename rawType::vector_t&>(registerImage_);
+  }
+
+  __RawMatrix() = default;
+  __RawMatrix(const sycl::vec<T, N>& rh) : registerImage_(rh) {}
+  __RawMatrix(sycl::vec<T, N>&& rh) : registerImage_(std::move(rh)) {}
+  __RawMatrix(const __RawMatrix &rh) : registerImage_(rh.registerImage_) {}
+  __RawMatrix(__RawMatrix&& rh) : registerImage_(std::move(rh.registerImage_)) {}
+
+  inline __RawMatrix& operator = (__RawMatrix&& rh) {
+    registerImage_ = std::move(rh.registerImage_);
+    return *this;
+  }
+  inline __RawMatrix& operator = (const __RawMatrix& rh) {
+    registerImage_ = rh.registerImage_;
+    return *this;
+  }
+  inline __RawMatrix operator + (const __RawMatrix& m) {
+    return { registerImage_ + m.registerImage_ };
+  }
+  inline __RawMatrix operator - (const __RawMatrix& m) {
+    return { registerImage_ - m.registerImage_ };
+  }
+  inline __RawMatrix operator * (const __RawMatrix& m) {
+    return { registerImage_ * m.registerImage_ };
+  }
+  inline __RawMatrix operator / (const __RawMatrix& m) {
+    return { registerImage_ * m.registerImage_ };
+  }
+
+  template <CacheCtrl CTL = CacheCtrl::DEFAULT>
+  inline __RawMatrix& load(const AddressPayload<Width, Height, ArraySize> &address);
+
+  template <CacheCtrl CTL = CacheCtrl::DEFAULT>
+  inline __RawMatrix& store(const AddressPayload<Width, Height, ArraySize> &address);
+
+  // Review as re-shuffled tensor in logic view, need careful review here.
+  template <DataShuffle reshuffle>
+  inline typename std::enable_if<Transpose == DataShuffle::vnni
+  && reshuffle == DataShuffle::none,
+    __RawMatrix<T, Width * 2, Height / 2, reshuffle, ArraySize, SubGroupSize>
+      >::type cast () {
+    return {registerImage_};
+  }
+
+  template <DataShuffle reshuffle>
+  inline typename std::enable_if<Transpose == DataShuffle::transpose
+  && reshuffle == DataShuffle::none,
+    __RawMatrix<T, Height, Width, reshuffle, ArraySize, SubGroupSize>
+      >::type cast() {
+    return {registerImage_};
+  }
+
+  template <DataShuffle reshuffle>
+  inline typename std::enable_if<Transpose == DataShuffle::none
+  && reshuffle == DataShuffle::vnni,
+    __RawMatrix<T, Width /2, Height * 2, reshuffle, ArraySize, SubGroupSize>
+      >::type cast() {
+    return {registerImage_};
+  }
+
+  template <DataShuffle reshuffle>
+  inline typename std::enable_if<Transpose == DataShuffle::none
+  && reshuffle == DataShuffle::transpose,
+    __RawMatrix<T, Height, Width, DataShuffle::transpose, ArraySize, SubGroupSize>
+      >::type cast() {
+    return {registerImage_};
+  }
+
+  //
+  // XXX: performance problem for SIMD16/sycl::half when compiler generate
+  // two instructions for single register operation.
+  //
+  inline void zero() {
+    registerImage_ =0;
+  }
+
+private:
+  rawType registerImage_;
 };
