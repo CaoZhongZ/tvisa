@@ -217,7 +217,8 @@ template <typename T, int Width, int Height, int ArraySize, int SubGroupSize>
 struct InnerLayout<T, Width, Height, DataShuffle::vnni, ArraySize, SubGroupSize> {
 private:
   static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
-  static constexpr int PaddedHeight = (Height + NElemsPerLane -1) / NElemsPerLane;
+  static constexpr int PaddedHeight = (Height + NElemsPerLane -1)
+                                      / NElemsPerLane * NElemsPerLane;
   static constexpr int PaddedWidth = 1 << Log2<sizeof(T) * Width>();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
   static constexpr int AllocSize = PaddedWidth * PaddedHeight * ArraySize;
