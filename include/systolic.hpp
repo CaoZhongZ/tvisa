@@ -74,7 +74,7 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
         "dpas.hf.hf.8." str(M) " (M1, 16) %0.0 %1.0 aliasB.0 aliasA(0, 0)\n"  \
         "}\n" \
         : "=rw"(C.getStorage()): "rw"(Accum.getStorage()),  \
-        "rw"(A.getRawStorage()), "rw"(B.getRawStorage())  \
+        "rw"(A.getStorage()), "rw"(B.getStorage())  \
     );  \
   }
 
