@@ -62,7 +62,7 @@ struct AddressPayload {
         || OldArrayLength != ArrayLength) {
       constexpr uint32_t BWHAL = (BlockWidth -1)
         | (BlockHeight -1) << 8 | ((ArrayLength -1) & 0xf) << 16;
-      asm volatile ("mov (M1,1) %0(0,7)<1> %1\n" : "=rw"(payloadReg_) : "i"(BWHAL));
+      asm volatile ("mov (M1,1) %0(0,7)<1> %1\n" : "+rw"(payloadReg_) : "i"(BWHAL));
     }
   }
 
@@ -74,7 +74,7 @@ struct AddressPayload {
         || OldArrayLength != ArrayLength) {
       constexpr uint32_t BWHAL = (BlockWidth -1)
         | (BlockHeight -1) << 8 | ((ArrayLength -1) & 0xf) << 16;
-      asm volatile ("mov (M1,1) %0(0,7)<1> %1\n": "=rw"(payloadReg_): "i"(BWHAL));
+      asm volatile ("mov (M1,1) %0(0,7)<1> %1\n": "+rw"(payloadReg_): "i"(BWHAL));
     }
     return *this;
   }
