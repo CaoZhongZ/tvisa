@@ -238,6 +238,7 @@ struct __Matrix {
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
 
+  static_assert(sizeof(sycl::vec<T, N>)/sizeof(uint32_t) == NumRegs);
   using rawType = sycl::vec<uint32_t, sizeof(sycl::vec<T, N>)/sizeof(uint32_t)>;
 
   inline typename sycl::vec<T, N>::vector_t& getStorage() {
