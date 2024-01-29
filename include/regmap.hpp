@@ -247,14 +247,13 @@ struct __Matrix {
     return reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(registerImage_);
   }
 
-  /* XXX: Generate unecessary copy, WTF???
+  /* XXX: Generate unecessary copy, WTF??? */
   inline typename rawType::vector_t& getRawStorage() {
     return reinterpret_cast<typename rawType::vector_t&>(registerImage_);
   }
   inline const typename rawType::vector_t& getRawStorage() const {
     return reinterpret_cast<const typename rawType::vector_t&>(registerImage_);
   }
-  */
 
   __Matrix() = default;
   __Matrix(const sycl::vec<T, N>& rh) : registerImage_(rh) {}
