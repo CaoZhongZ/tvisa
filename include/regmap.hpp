@@ -110,7 +110,7 @@ struct AddressPayload {
         "mov (M1,1) alias64(0, 0)<1> %1(0, 0)<0;1,0>\n"
         // "mov (M1,16) %0(0,0)<1> %0(0,0)<1;1,0>\n"
         "}\n"
-        : :"rw"(payloadReg_), "rw"(addr)
+        : "+rw"(payloadReg_): "rw"(addr)
     );
     return *this;
   }
