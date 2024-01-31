@@ -29,134 +29,87 @@ size_t parse_nelems(const std::string& nelems_string) {
 template <typename T>
 void fill_sequential(T *p, int rank, size_t nelems) {
   for (size_t i = 0; i < nelems; ++ i) {
-    p[i] = i/1024. + rank;
+    p[i] = i + rank;
   }
 }
 
-template <typename T>
-void show_tile(T* start, int W, int H, size_t pitch) {
-  auto* tile = reinterpret_cast<T (*)[pitch/sizeof(T)]>(start);
-  for (int h = 0; h < H; ++ h) {
-    for (int w = 0; w < W; ++ w) {
-      std::cout<<tile[h][w]<<", ";
-    }
-    std::cout<<std::endl;
-  }
-}
-
-template <typename T>
-struct tile_accumulate {
-  tile_accumulate(T* dst, sycl::half* src, int surfaceW, int surfaceH, int surfaceP)
-    : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW), surfaceP(surfaceP)
+struct barrier_test {
+  barrier_test()
   {}
 
-  void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> index) const {
+  void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::nd_item<1> item) const {
 #if defined(__SYCL_DEVICE_ONLY__)
-    auto grp_num = index / SG_SZ;
+    auto n_sg = item.get_sub_group().get_group_range()[0];
+    auto sg_id = item.get_sub_group().get_group_id()[0];
 
-    auto x_off = grp_num * 16;
-    auto y_off = 0;
+    constexpr int n_barrier = 4;
 
-    AddressPayload<16, 8> srcAddress(src,
-        surfaceW, surfaceH, surfaceP, x_off, y_off);
+    auto n_threads = n_sg / 4;
+    auto id = sg_id % 4;
 
-    AddressPayload<16, 16> dstAddress(srcAddress);
-    dstAddress.updateSurfaceBase(dst);
+    named_barrier_init<4>();
 
-    __Matrix<sycl::half, 16, 8> tmp0;
-    __Matrix<sycl::half, 16, 16, DataShuffle::vnni> tmp1;
-
-    tmp0.load(srcAddress);
-    tmp1.load(srcAddress);
-
-    __Matrix<T, 16, 8> ret;
-    ret.zero();
-
-    dpas(ret, ret, tmp0, tmp1);
-
-    ret.store(dstAddress);
-
-#else
-    dst[index] += src[index];
+    nbarrier_signal(id, n_threads);
+    nbarrier_wait(id);
 #endif
   }
-
-private:
-  sycl::half* src;
-  T* dst;
-  int surfaceH;
-  int surfaceW;
-  int surfaceP;
 };
+
+struct barrier_test1 {
+  barrier_test1()
+  {}
+
+  void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::nd_item<1> item) const {
+#if defined(__SYCL_DEVICE_ONLY__)
+    auto n_sg = item.get_sub_group().get_group_range()[0];
+    auto sg_id = item.get_sub_group().get_group_id()[0];
+
+    constexpr int n_barrier = 4;
+
+    uint8_t n_threads = n_sg / 4;
+    uint8_t id = sg_id % 4;
+
+    named_barrier_init<4>();
+
+    BarrierPayload barrier(id,
+        BarrierType::ProducerConsumer,
+        n_threads, n_threads);
+
+    nbarrier_signal(barrier);
+    nbarrier_wait(id);
+#endif
+  }
+};
+
 
 int main(int argc, char *argv[]) {
   cxxopts::Options opts("Copy", "Copy baseline for performance");
   opts.allow_unrecognised_options();
   opts.add_options()
-    ("p,pitch", "Pitch of the surface",
-     cxxopts::value<size_t>()->default_value("4096"))
-    ("s,surround", "Height of the outer surface",
-     cxxopts::value<size_t>()->default_value("4096"))
-    ("w,width", "Width of the surface",
-     cxxopts::value<int>()->default_value("1024"))
-    ("h,height", "Height of the surface",
-     cxxopts::value<int>()->default_value("1024"))
-    ("g,groups", "Number of subgroups",
+    ("g,group", "Number of group",
      cxxopts::value<size_t>()->default_value("1"))
+    ("s,subgroup", "Number of subgroup",
+     cxxopts::value<size_t>()->default_value("16"))
+    ("n,numbarrier", "Number of barriers",
+     cxxopts::value<size_t>()->default_value("4"))
     ;
 
   auto parsed_opts = opts.parse(argc, argv);
-
-  auto surfaceP = parsed_opts["pitch"].as<size_t>();
-  auto surround = parsed_opts["surround"].as<size_t>();
-  auto surfaceH = parsed_opts["height"].as<int>();
-  auto surfaceW = parsed_opts["width"].as<int>();
-
-  auto groups = parsed_opts["groups"].as<size_t>();
-
-  using t_type = sycl::half;
-
-  auto nelems = surfaceP * surround / sizeof(t_type);
-  auto alloc_size = surfaceP * surround;
+  auto n_group = parsed_opts["group"].as<size_t>();
+  auto n_subgroup = parsed_opts["subgroup"].as<size_t>();
+  auto n_barrier = parsed_opts["numbarrier"].as<size_t>();
 
   auto queue = currentQueue(0, 0);
 
-  auto* src = sycl::malloc_device(alloc_size, queue);
-  auto* dst = sycl::malloc_device(alloc_size, queue);
-  auto* b_host = sycl::malloc_host(alloc_size, queue);
-  auto* b_check = sycl::malloc_host(alloc_size, queue);
-
-  release_guard __guard([&]{
-    sycl::free(src, queue);
-    sycl::free(dst, queue);
-    sycl::free(b_host, queue);
-    sycl::free(b_check, queue);
-  });
-
-  fill_sequential(
-      (t_type *)b_host, 0., nelems
-  );
-
-  queue.memcpy(src, b_host, alloc_size);
-  queue.wait();
-
-  constexpr int Width = 16;
-  constexpr int Height = 8;
-
-  queue.fill<t_type>(dst, 8., nelems);
+  std::cout<<"Launch kernel("
+    <<n_group * n_subgroup * 16<<", "
+    <<n_subgroup * 16<<")"<<std::endl;
 
   queue.submit([&](sycl::handler &h) {
-    h.parallel_for(sycl::range<1> { groups * SG_SZ },
-        tile_accumulate<t_type>(
-          reinterpret_cast<t_type *>(dst),
-          reinterpret_cast<t_type *>(src),
-          surfaceW, surfaceH, surfaceP));
+    h.parallel_for(sycl::nd_range<1> {
+          sycl::range<1> {n_group * n_subgroup * 16},
+          sycl::range<1> {n_subgroup * 16}}, barrier_test1());
   });
 
-  queue.memcpy(b_check, dst, alloc_size);
   queue.wait();
-
-  show_tile((t_type *)b_host, Width, Height, surfaceP);
-  std::cout<<"------------------------------------------------"<<std::endl;
-  show_tile((t_type *)b_check, Width, Height, surfaceP);
 }

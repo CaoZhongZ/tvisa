@@ -138,9 +138,37 @@ private:
   uint32_t payloadReg_;
 };
 
+struct BarrierPayload {
+  BarrierPayload(
+      uint8_t ID,
+      BarrierType type,
+      uint8_t NumOfProducer,
+      uint8_t NumOfConsumer) {
+    uint32_t payload = ID | ((uint32_t)type) << 14
+      | ((uint32_t)NumOfProducer) << 16
+      | ((uint32_t)NumOfConsumer) << 24;
+
+    asm volatile ("\n"
+        "mov (M1, 1) %0(0,2)<1> %1(0,0)<0;1,0>\n"
+        : "=rw"(payloadReg_) : "rw"(payload));
+  }
+
+  inline uint32_t& getPayload() {
+    return payloadReg_;
+  }
+
+  inline const uint32_t& getPayload() const {
+    return payloadReg_;
+  }
+private:
+  uint32_t payloadReg_;
+};
+
 #else
 template <int BlockWidth, int BlockHeight, int ArrayLength = 1>
 struct AddressPayload;
+
+struct BarrierPayload;
 #endif
 
 template <typename T, int Width, int Height,
@@ -288,6 +316,116 @@ struct __Matrix {
 
 private:
   sycl::vec<T, N> registerImage_;
+};
+
+//
+// Test for normal array type instead of vector type
+//
+template <typename T, int Width, int Height,
+         DataShuffle Transpose = DataShuffle::none,
+         int ArraySize = 1, int SubGroupSize = 16>
+struct __ArrayMatrix {
+  using layout = InnerLayout<T, Width, Height, Transpose, ArraySize, SubGroupSize>;
+  static constexpr int NumRegs = layout::NumRegs;
+  static constexpr int N = layout::N;
+
+  static_assert(NumRegs == sizeof(T) * N/sizeof(uint32_t));
+
+  /* XXX: Generate unecessary copy, WTF???
+  inline typename sycl::vec<T, N>::vector_t& getStorage() {
+    return reinterpret_cast<typename sycl::vec<T, N>::vector_t&>(registerImage_);
+  }
+  inline const typename sycl::vec<T, N>::vector_t& getStorage() const {
+    return reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(registerImage_);
+  }
+  */
+
+  typedef T (& array_ref) [N];
+  typedef const T (& const_array_ref) [N];
+
+  inline array_ref getStorage() {
+    return registerImage_;
+  }
+  inline const_array_ref getStorage() const {
+    return registerImage_;
+  }
+
+  __ArrayMatrix() = default;
+  __ArrayMatrix(const T (&rh)[N]) {
+    memcpy(registerImage_, rh.registerImage_, sizeof(*this));
+  }
+
+  __ArrayMatrix(const __ArrayMatrix &rh) : __ArrayMatrix(rh.registerImage_) {}
+
+  inline __ArrayMatrix& operator = (const __ArrayMatrix& rh) {
+    memcpy(registerImage_, rh.registerImage_, sizeof(*this));
+    return *this;
+  }
+
+  /* TODO: support
+  inline __ArrayMatrix operator + (const __ArrayMatrix& m) {
+    return { registerImage_ + m.registerImage_ };
+  }
+  inline __ArrayMatrix operator - (const __ArrayMatrix& m) {
+    return { registerImage_ - m.registerImage_ };
+  }
+  inline __ArrayMatrix operator * (const __ArrayMatrix& m) {
+    return { registerImage_ * m.registerImage_ };
+  }
+  inline __ArrayMatrix operator / (const __ArrayMatrix& m) {
+    return { registerImage_ * m.registerImage_ };
+  }
+  */
+
+  template <CacheCtrl CTL = CacheCtrl::DEFAULT>
+  inline __ArrayMatrix& load(const AddressPayload<Width, Height, ArraySize> &address);
+
+  template <CacheCtrl CTL = CacheCtrl::DEFAULT>
+  inline __ArrayMatrix& store(const AddressPayload<Width, Height, ArraySize> &address);
+
+  // Review as re-shuffled tensor in logic view, need careful review here.
+  template <DataShuffle reshuffle>
+  inline typename std::enable_if<Transpose == DataShuffle::vnni
+  && reshuffle == DataShuffle::none,
+    __ArrayMatrix<T, Width * 2, Height / 2, reshuffle, ArraySize, SubGroupSize>
+      >::type cast () {
+    return {registerImage_};
+  }
+
+  template <DataShuffle reshuffle>
+  inline typename std::enable_if<Transpose == DataShuffle::transpose
+  && reshuffle == DataShuffle::none,
+    __ArrayMatrix<T, Height, Width, reshuffle, ArraySize, SubGroupSize>
+      >::type cast() {
+    return {registerImage_};
+  }
+
+  template <DataShuffle reshuffle>
+  inline typename std::enable_if<Transpose == DataShuffle::none
+  && reshuffle == DataShuffle::vnni,
+    __ArrayMatrix<T, Width /2, Height * 2, reshuffle, ArraySize, SubGroupSize>
+      >::type cast() {
+    return {registerImage_};
+  }
+
+  template <DataShuffle reshuffle>
+  inline typename std::enable_if<Transpose == DataShuffle::none
+  && reshuffle == DataShuffle::transpose,
+    __ArrayMatrix<T, Height, Width, DataShuffle::transpose, ArraySize, SubGroupSize>
+      >::type cast() {
+    return {registerImage_};
+  }
+
+  //
+  // XXX: performance problem for SIMD16/sycl::half when compiler generate
+  // two instructions for single register operation.
+  //
+  inline void zero() {
+    registerImage_ =0;
+  }
+
+private:
+  T registerImage_[N];
 };
 
 // __RawMatrix for workaround IGC dpas type requirement if alias doesn't work

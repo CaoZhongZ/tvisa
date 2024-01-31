@@ -18,6 +18,12 @@ enum CacheCtrl {
   L1WB_L3WB
 };
 
+enum BarrierType {
+  ProducerConsumer = 0,
+  ProducerOnly,
+  ConsumerOnly
+};
+
 #include "regmap.hpp"
 #include "lsc_untyped_list.hpp"
 
@@ -342,32 +348,6 @@ struct OptLsc2DStore<16, 4, DataShuffle::none, CacheCtrl::L1UC_L3UC> {
 
 #endif
 
-/*
-template <int BlockWidth, int BlockHeight,
-         DataShuffle Transpose, CacheCtrl CTL= CacheCtrl::DEFAULT>
-struct OptLsc2DLoad {
-  template <typename T> static inline void run(
-      __Matrix<T, BlockWidth, BlockHeight, Transpose>& M,
-      AddressPayload<BlockWidth, BlockHeight>& address) {
-    constexpr auto NumRegs = M.NumRegs;
-    constexpr auto DataWidth = Log2<sizeof(T)>();
-    RawSendLoad<DataWidth, NumRegs, Transpose, CTL>::run(M.getStorage(), address);
-  }
-};
-
-template <int BlockWidth, int BlockHeight,
-         DataShuffle Transpose, CacheCtrl CTL= CacheCtrl::DEFAULT>
-struct OptLsc2DStore {
-  template <typename T> static inline void run(
-      AddressPayload<BlockWidth, BlockHeight>& address,
-      __Matrix<T, BlockWidth, BlockHeight, Transpose>& M) {
-    constexpr auto NumRegs = M.NumRegs;
-    constexpr auto DataWidth = Log2<sizeof(T)>();
-    RawSendStore<DataWidth, NumRegs, Transpose, CTL>::run(address, M.getStorage());
-  }
-};
-*/
-
 }
 
 // API
@@ -501,6 +481,34 @@ __Matrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>::store(
     const AddressPayload<Width, Height, ArraySize>& address
 ) {
   constexpr auto NumRegs = __Matrix::NumRegs;
+  constexpr auto DataWidth = Log2<sizeof(T)>();
+  RawSendStore<DataWidth, NumRegs, Transpose, CTL>::run(address, this->getStorage());
+  return *this;
+}
+
+template <typename T, int Width, int Height,
+         DataShuffle Transpose,
+         int ArraySize, int SubGroupSize>
+template <CacheCtrl CTL>
+inline __ArrayMatrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>&
+__ArrayMatrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>::load(
+    const AddressPayload<Width, Height, ArraySize>& address
+) {
+  constexpr auto NumRegs = __ArrayMatrix::NumRegs;
+  constexpr auto DataWidth = Log2<sizeof(T)>();
+  RawSendLoad<DataWidth, NumRegs, Transpose, CTL>::run(this->getStorage(), address);
+  return *this;
+}
+
+template <typename T, int Width, int Height,
+         DataShuffle Transpose,
+         int ArraySize, int SubGroupSize>
+template <CacheCtrl CTL>
+inline __ArrayMatrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>&
+__ArrayMatrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>::store(
+    const AddressPayload<Width, Height, ArraySize>& address
+) {
+  constexpr auto NumRegs = __ArrayMatrix::NumRegs;
   constexpr auto DataWidth = Log2<sizeof(T)>();
   RawSendStore<DataWidth, NumRegs, Transpose, CTL>::run(address, this->getStorage());
   return *this;

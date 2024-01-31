@@ -19,23 +19,32 @@ template <int N> void named_barrier_init() {
 }
 
 static inline void barrier() {
-  asm volatile ("barrier");
+  asm volatile ("barrier\n");
 }
 
 static inline void nbarrier_wait(uint8_t id) {
-  asm volatile ("nbarrier.wait %0(0,0)<0;1,0>" :: "rw"(id));
+  asm volatile ("nbarrier.wait %0(0,0)<0;1,0>\n" :: "rw"(id));
 }
 
 static inline void nbarrier_signal(uint8_t id, uint8_t n_threads) {
-  asm volatile ("nbarrier.signal %0(0,0)<0;1,0> %1(0,0)<0;1,0>" :: "rw"(id), "rw"(n_threads));
+  asm volatile (
+      "nbarrier.signal %0(0,0)<0;1,0> %1(0,0)<0;1,0>\n"
+      :: "rw"(id), "rw"(n_threads));
+}
+
+// raw send version with full named barrier potential exposed
+static inline void nbarrier_signal(const BarrierPayload& Barrier) {
+  asm volatile (
+      "raw_sends.3.1.0.0 (M1, 1) 0x0:ud 0x02000004:ud %0.0 V0.0 V0.0\n"
+      :: "rw"(Barrier.getPayload()));
 }
 
 static inline void sbarrier_wait() {
-  asm volatile ("nbarrier.wait");
+  asm volatile ("sbarrier.wait\n");
 }
 
 static inline void sbarrier_signal() {
-  asm volatile ("nbarrier.signal");
+  asm volatile ("sbarrier.signal\n");
 }
 #endif
 
@@ -57,87 +66,87 @@ template <LscType Id, LscFenceOp Op, LscScope Scope>
 void lscFence();
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::None, LscScope::Group>() {
-  asm("lsc_fence.ugm.none.group");
+  asm("lsc_fence.ugm.none.group\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::None, LscScope::Local>() {
-  asm("lsc_fence.ugm.none.local");
+  asm("lsc_fence.ugm.none.local\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::None, LscScope::Tile>() {
-  asm("lsc_fence.ugm.none.tile");
+  asm("lsc_fence.ugm.none.tile\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::None, LscScope::GPU>() {
-  asm("lsc_fence.ugm.none.gpu");
+  asm("lsc_fence.ugm.none.gpu\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::None, LscScope::GPUs>() {
-  asm("lsc_fence.ugm.none.gpus");
+  asm("lsc_fence.ugm.none.gpus\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::None, LscScope::SystemRel>() {
-  asm("lsc_fence.ugm.none.system");
+  asm("lsc_fence.ugm.none.system\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::None, LscScope::SystemAcq>() {
-  asm("lsc_fence.ugm.none.sysacq");
+  asm("lsc_fence.ugm.none.sysacq\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Evict, LscScope::Group>() {
-  asm("lsc_fence.ugm.evict.group");
+  asm("lsc_fence.ugm.evict.group\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Evict, LscScope::Local>() {
-  asm("lsc_fence.ugm.evict.local");
+  asm("lsc_fence.ugm.evict.local\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Evict, LscScope::Tile>() {
-  asm("lsc_fence.ugm.evict.tile");
+  asm("lsc_fence.ugm.evict.tile\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Evict, LscScope::GPU>() {
-  asm("lsc_fence.ugm.evict.gpu");
+  asm("lsc_fence.ugm.evict.gpu\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Evict, LscScope::GPUs>() {
-  asm("lsc_fence.ugm.evict.gpus");
+  asm("lsc_fence.ugm.evict.gpus\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Evict, LscScope::SystemRel>() {
-  asm("lsc_fence.ugm.evict.system");
+  asm("lsc_fence.ugm.evict.system\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Evict, LscScope::SystemAcq>() {
-  asm("lsc_fence.ugm.evict.sysacq");
+  asm("lsc_fence.ugm.evict.sysacq\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Clean, LscScope::Group>() {
-  asm("lsc_fence.ugm.clean.group");
+  asm("lsc_fence.ugm.clean.group\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Clean, LscScope::Local>() {
-  asm("lsc_fence.ugm.clean.local");
+  asm("lsc_fence.ugm.clean.local\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Clean, LscScope::Tile>() {
-  asm("lsc_fence.ugm.clean.tile");
+  asm("lsc_fence.ugm.clean.tile\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Clean, LscScope::GPU>() {
-  asm("lsc_fence.ugm.clean.gpu");
+  asm("lsc_fence.ugm.clean.gpu\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Clean, LscScope::GPUs>() {
-  asm("lsc_fence.ugm.clean.gpus");
+  asm("lsc_fence.ugm.clean.gpus\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Clean, LscScope::SystemRel>() {
-  asm("lsc_fence.ugm.clean.system");
+  asm("lsc_fence.ugm.clean.system\n");
 }
 
 template <> void lscFence<LscType::Ugm, LscFenceOp::Clean, LscScope::SystemAcq>() {
-  asm("lsc_fence.ugm.clean.sysacq");
+  asm("lsc_fence.ugm.clean.sysacq\n");
 }
 
 #endif

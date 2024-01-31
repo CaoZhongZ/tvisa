@@ -31,13 +31,13 @@ struct RawSendStore {
 
 #include "list_raw_loads.list"
 
-#define EnumerateStores(DataWidth, DestRegNumber, DataShuffle, CacheCtrl, DescStr) \
+#define EnumerateStores(DataWidth, SrcRegNumber, DataShuffle, CacheCtrl, DescStr) \
   template <> \
-  struct RawSendStore<DataWidth, DestRegNumber, DataShuffle, CacheCtrl> { \
+  struct RawSendStore<DataWidth, SrcRegNumber, DataShuffle, CacheCtrl> { \
     template <typename T, typename AddressPayload> \
     static inline void run(const AddressPayload& address, const T& target) { \
       asm volatile ("\n"  \
-          "raw_sends.15.1." str(DestRegNumber) ".0 (M1, 1) 0x0:ud " str(DescStr) ":ud %0.0 %1.0 V0.0\n"  \
+          "raw_sends.15.1." str(SrcRegNumber) ".0 (M1, 1) 0x0:ud " str(DescStr) ":ud %0.0 %1.0 V0.0\n"  \
           :: "rw"(address.getPayload()), "rw"(target));  \
     } \
   };
