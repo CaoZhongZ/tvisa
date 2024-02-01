@@ -19,7 +19,7 @@ template <int N> constexpr int Log2() {
   return Log2<N/2>() + 1;
 }
 
-template <> constepxr int Log2<4>() {
+template <> constexpr int Log2<4>() {
   return 2;
 }
 template <> constexpr int Log2<2>() {
@@ -38,8 +38,8 @@ template <int N, int L> constexpr int LowBound() {
 
 //
 // XXX: AddressPayload is reinterpretable among configurations
-//  1. Surface Pitch is in unit of byte
-//  2. Surface Width is in unit of byte
+//  1. Surface Pitch is in byte
+//  2. Surface Width is in byte
 //  3. Surface Height is in elements???
 //  4. StartX/StartY and Block Width/Height are in elements???
 //
@@ -232,7 +232,7 @@ private:
   static constexpr int PaddedHeight = (Height + NElemsPerLane -1)
                                       / NElemsPerLane * NElemsPerLane;
   // We eliminate the case implicit operation is carried.
-  static_assert(Height != PaddedHeight, "Error: HeightxElemsize must align to 4 bytes");
+  static_assert(Height == PaddedHeight, "Error: HeightxElemsize must align to 4 bytes");
   static constexpr int PaddedWidth = 1 << Log2Ceiling<sizeof(T) * Width>();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
   static constexpr int AllocSize = PaddedWidth * PaddedHeight * ArraySize;
@@ -253,7 +253,7 @@ struct __Matrix {
   using layout = InnerLayout<T, Width, Height, Transpose, SubGroupSize, ArraySize>;
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
-  static constexpr int LSCWidth = Layout::LSCWidth;
+  static constexpr int LSCWidth = layout::LSCWidth;
 
   static_assert(sizeof(sycl::vec<T, N>)/sizeof(uint32_t) == NumRegs);
   using rawType = sycl::vec<uint32_t, sizeof(sycl::vec<T, N>)/sizeof(uint32_t)>;
@@ -361,6 +361,7 @@ struct __ArrayMatrix {
   using layout = InnerLayout<T, Width, Height, Transpose, SubGroupSize, ArraySize>;
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
+  static constexpr int LSCWidth = layout::LSCWidth;
 
   static_assert(NumRegs == sizeof(T) * N/sizeof(uint32_t));
 
@@ -464,7 +465,7 @@ private:
 // __RawMatrix for workaround IGC dpas type requirement if alias doesn't work
 template <typename T, int Width, int Height,
          DataShuffle Transpose = DataShuffle::none,
-         int SubGroupSize = 16 int ArraySize = 1>
+         int SubGroupSize = 16, int ArraySize = 1>
 struct __RawMatrix {
   using layout = InnerLayout<T, Width, Height, Transpose, SubGroupSize, ArraySize>;
   static constexpr int NumRegs = layout::NumRegs;

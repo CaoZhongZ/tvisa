@@ -461,7 +461,7 @@ static inline void lscStore(
 
 template <typename T, int Width, int Height,
          DataShuffle Transpose,
-         int SubGroupSize int ArraySize>
+         int SubGroupSize, int ArraySize>
 template <CacheCtrl CTL>
 inline __Matrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>&
 __Matrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>::load(
@@ -475,7 +475,7 @@ __Matrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>::load(
 
 template <typename T, int Width, int Height,
          DataShuffle Transpose,
-         int SubGroupSize int ArraySize>
+         int SubGroupSize, int ArraySize>
 template <CacheCtrl CTL>
 inline __Matrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>&
 __Matrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>::store(
@@ -490,21 +490,21 @@ __Matrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>::store(
 
 template <typename T, int Width, int Height,
          DataShuffle Transpose,
-         int SubGroupSize int ArraySize>
+         int SubGroupSize, int ArraySize>
 template <CacheCtrl CTL>
 inline __ArrayMatrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>&
 __ArrayMatrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>::load(
     const AddressPayload<Width, Height, ArraySize>& address
 ) {
   constexpr auto NumRegs = __ArrayMatrix::NumRegs;
-  constexpr auto DataWidth = __Matrix::LSCWidth;
+  constexpr auto DataWidth = __ArrayMatrix::LSCWidth;
   RawSendLoad<DataWidth, NumRegs, Transpose, CTL>::run(this->getStorage(), address);
   return *this;
 }
 
 template <typename T, int Width, int Height,
          DataShuffle Transpose,
-         int SubGroupSize int ArraySize>
+         int SubGroupSize, int ArraySize>
 template <CacheCtrl CTL>
 inline __ArrayMatrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>&
 __ArrayMatrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>::store(
