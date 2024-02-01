@@ -5,6 +5,9 @@ class DataShuffle(Enum):
     transpose = 1
     vnni = 2
 
+class StoreShuffle(Enum):
+    none = 0
+
 class CacheCtrlNo(Enum):
     DEFAULT = 0
     L1UC_L3UC = 1
@@ -41,23 +44,32 @@ def generate_ecode(op, data_size, des_len, shuf, cache):
     return hex(base)
 
 def generate_rawsends(file_name, op):
-    data_sizes = [0, 1, 2, 3]
+    def encode_rawsends(op, shuf, data_sizes, des_lens, caches, file):
+        for data_size in data_sizes:
+            for des_len in des_lens:
+                for cache in caches:
+                    encode = generate_ecode(op, data_size, des_len, shuf, cache)
+                    func_str = f"{func_name}({data_size}, {des_len}, DataShuffle::{shuf.name}, CacheCtrl::{cache.name}, {encode});\n"
+                    file.write(func_str)
+
     if op == 3:
         des_lens = range(1, 33)
         func_name = 'EnumerateLoads'
+        shuffles = DataShuffle
     elif op == 7:
         des_lens = range(1, 9)
         func_name = 'EnumerateStores'
+        shuffles = StoreShuffle
 
     with open(file_name, 'w') as file:
-        for data_size in data_sizes:
-            for des_len in des_lens:
-                for shuf in DataShuffle:
-                    for cache in CacheCtrlNo:
-                        encode = generate_ecode(op, data_size, des_len, shuf, cache)
-                        func_str = f"{func_name}({data_size}, {des_len}, DataShuffle::{shuf.name}, CacheCtrl::{cache.name}, {encode});\n"
-                        file.write(func_str)
-                        # print(func_str)
+        for shuf in shuffles:
+            if shuf.value == 1:
+                data_sizes = [2, 3]
+            elif shuf.value == 2:
+                data_sizes = [0, 1]
+            else:
+                data_sizes = [0, 1, 2, 3]
+            encode_rawsends(op, shuf, data_sizes, des_lens, CacheCtrlNo, file)
 
 class DataWidth(Enum):
     d8c32 = 1

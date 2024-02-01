@@ -3,16 +3,30 @@
 #include <sycl/sycl.hpp>
 
 // TODO: move somewhere else
-template<int N> constexpr int Log2() {
+template<int N> constexpr int Log2Ceiling() {
+  return Log2Ceiling<N/2>() + 1;
+}
+
+template <> constexpr int Log2Ceiling<2>() {
+  return 1;
+}
+
+template <> constexpr int Log2Ceiling<1>() {
+  return 1;
+}
+
+template <int N> constexpr int Log2() {
   return Log2<N/2>() + 1;
 }
 
+template <> constepxr int Log2<4>() {
+  return 2;
+}
 template <> constexpr int Log2<2>() {
   return 1;
-};
-
+}
 template <> constexpr int Log2<1>() {
-  return 1;
+  return 0;
 }
 
 template <int N, int L> constexpr int LowBound() {
@@ -22,6 +36,13 @@ template <int N, int L> constexpr int LowBound() {
 
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 
+//
+// XXX: AddressPayload is reinterpretable among configurations
+//  1. Surface Pitch is in unit of byte
+//  2. Surface Width is in unit of byte
+//  3. Surface Height is in elements???
+//  4. StartX/StartY and Block Width/Height are in elements???
+//
 template <int BlockWidth, int BlockHeight, int ArrayLength = 1>
 struct AddressPayload {
   inline AddressPayload() = default;
@@ -178,23 +199,30 @@ struct InnerLayout;
 template <typename T, int Width, int Height, int ArraySize, int SubGroupSize>
 struct InnerLayout<T, Width, Height, DataShuffle::none, ArraySize, SubGroupSize> {
 private:
-  static constexpr int PaddedWidth = 1 << Log2<sizeof(T) * Width>();
+  static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
+  static constexpr int PaddedWidth = 1 << Log2Ceiling<sizeof(T) * Width>();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
   static constexpr int AllocSize = PaddedWidth * Height * ArraySize;
 public:
   static constexpr int NumRegs = (AllocSize + RegSize -1) / RegSize;
-  static constexpr int N = NumRegs * sizeof(int)/sizeof(T);
+  static constexpr int N = NumRegs * NElemsPerLane;
+  static constexpr int LSCWidth = Log2<sizeof(T)>();
 };
 
+//
+// Transpose is always on the granularity of equal or more than 4-byte
+//
 template <typename T, int Width, int Height, int ArraySize, int SubGroupSize>
 struct InnerLayout<T, Width, Height, DataShuffle::transpose, ArraySize, SubGroupSize> {
 private:
-  static constexpr int PaddedHeight = LowBound<1 << Log2<sizeof(T) * Height>(), 4 >();
+  static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
+  static constexpr int PaddedHeight = LowBound<1 << Log2Ceiling<sizeof(T) * Height>(), 4 >();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
   static constexpr int AllocSize = Width * PaddedHeight * ArraySize;
 public:
   static constexpr int NumRegs = (AllocSize + RegSize -1)/ RegSize;
-  static constexpr int N = NumRegs * sizeof(int)/sizeof(T);
+  static constexpr int N = NumRegs * NElemsPerLane;
+  static constexpr int LSCWidth = LowBound<Log2<sizeof(T)>(), 2>();
 };
 
 template <typename T, int Width, int Height, int ArraySize, int SubGroupSize>
@@ -203,12 +231,16 @@ private:
   static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
   static constexpr int PaddedHeight = (Height + NElemsPerLane -1)
                                       / NElemsPerLane * NElemsPerLane;
-  static constexpr int PaddedWidth = 1 << Log2<sizeof(T) * Width>();
+  // We eliminate the case implicit operation is carried.
+  static_assert(Height != PaddedHeight, "Error: HeightxElemsize must align to 4 bytes");
+  static constexpr int PaddedWidth = 1 << Log2Ceiling<sizeof(T) * Width>();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
   static constexpr int AllocSize = PaddedWidth * PaddedHeight * ArraySize;
 public:
   static constexpr int NumRegs = (AllocSize + RegSize -1) / RegSize;
-  static constexpr int N = NumRegs * sizeof(int)/sizeof(T);
+  static constexpr int N = NumRegs * NElemsPerLane;
+  static constexpr int LSCWidth = Log2<sizeof(T)>();
+  static_assert(LSCWidth < 2, "VNNI only makes sense on less than 16-bit");
 };
 
 //
@@ -221,6 +253,7 @@ struct __Matrix {
   using layout = InnerLayout<T, Width, Height, Transpose, ArraySize, SubGroupSize>;
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
+  static constexpr int LSCWidth = Layout::LSCWidth;
 
   static_assert(sizeof(sycl::vec<T, N>)/sizeof(uint32_t) == NumRegs);
   using rawType = sycl::vec<uint32_t, sizeof(sycl::vec<T, N>)/sizeof(uint32_t)>;
