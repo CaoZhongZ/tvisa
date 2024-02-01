@@ -193,11 +193,11 @@ struct BarrierPayload;
 #endif
 
 template <typename T, int Width, int Height,
-    DataShuffle Transpose, int ArraySize = 1, int SubGroupSize = 16>
+    DataShuffle Transpose, int SubGroupSize = 16, int ArraySize = 1>
 struct InnerLayout;
 
-template <typename T, int Width, int Height, int ArraySize, int SubGroupSize>
-struct InnerLayout<T, Width, Height, DataShuffle::none, ArraySize, SubGroupSize> {
+template <typename T, int Width, int Height, int SubGroupSize, int ArraySize>
+struct InnerLayout<T, Width, Height, DataShuffle::none, SubGroupSize, ArraySize> {
 private:
   static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
   static constexpr int PaddedWidth = 1 << Log2Ceiling<sizeof(T) * Width>();
@@ -212,8 +212,8 @@ public:
 //
 // Transpose is always on the granularity of equal or more than 4-byte
 //
-template <typename T, int Width, int Height, int ArraySize, int SubGroupSize>
-struct InnerLayout<T, Width, Height, DataShuffle::transpose, ArraySize, SubGroupSize> {
+template <typename T, int Width, int Height, int SubGroupSize, int ArraySize>
+struct InnerLayout<T, Width, Height, DataShuffle::transpose, SubGroupSize, ArraySize> {
 private:
   static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
   static constexpr int PaddedHeight = LowBound<1 << Log2Ceiling<sizeof(T) * Height>(), 4 >();
@@ -225,8 +225,8 @@ public:
   static constexpr int LSCWidth = LowBound<Log2<sizeof(T)>(), 2>();
 };
 
-template <typename T, int Width, int Height, int ArraySize, int SubGroupSize>
-struct InnerLayout<T, Width, Height, DataShuffle::vnni, ArraySize, SubGroupSize> {
+template <typename T, int Width, int Height, int SubGroupSize, int ArraySize>
+struct InnerLayout<T, Width, Height, DataShuffle::vnni, SubGroupSize, ArraySize> {
 private:
   static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
   static constexpr int PaddedHeight = (Height + NElemsPerLane -1)
@@ -248,9 +248,9 @@ public:
 //
 template <typename T, int Width, int Height,
          DataShuffle Transpose = DataShuffle::none,
-         int ArraySize = 1, int SubGroupSize = 16>
+         int SubGroupSize = 16, int ArraySize = 1>
 struct __Matrix {
-  using layout = InnerLayout<T, Width, Height, Transpose, ArraySize, SubGroupSize>;
+  using layout = InnerLayout<T, Width, Height, Transpose, SubGroupSize, ArraySize>;
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
   static constexpr int LSCWidth = Layout::LSCWidth;
@@ -310,7 +310,7 @@ struct __Matrix {
   template <DataShuffle reshuffle>
   inline typename std::enable_if<Transpose == DataShuffle::vnni
   && reshuffle == DataShuffle::none,
-    __Matrix<T, Width * 2, Height / 2, reshuffle, ArraySize, SubGroupSize>
+    __Matrix<T, Width * 2, Height / 2, reshuffle, SubGroupSize, ArraySize>
       >::type cast () {
     return {registerImage_};
   }
@@ -318,7 +318,7 @@ struct __Matrix {
   template <DataShuffle reshuffle>
   inline typename std::enable_if<Transpose == DataShuffle::transpose
   && reshuffle == DataShuffle::none,
-    __Matrix<T, Height, Width, reshuffle, ArraySize, SubGroupSize>
+    __Matrix<T, Height, Width, reshuffle, SubGroupSize, ArraySize>
       >::type cast() {
     return {registerImage_};
   }
@@ -326,7 +326,7 @@ struct __Matrix {
   template <DataShuffle reshuffle>
   inline typename std::enable_if<Transpose == DataShuffle::none
   && reshuffle == DataShuffle::vnni,
-    __Matrix<T, Width /2, Height * 2, reshuffle, ArraySize, SubGroupSize>
+    __Matrix<T, Width /2, Height * 2, reshuffle, SubGroupSize, ArraySize>
       >::type cast() {
     return {registerImage_};
   }
@@ -334,7 +334,7 @@ struct __Matrix {
   template <DataShuffle reshuffle>
   inline typename std::enable_if<Transpose == DataShuffle::none
   && reshuffle == DataShuffle::transpose,
-    __Matrix<T, Height, Width, DataShuffle::transpose, ArraySize, SubGroupSize>
+    __Matrix<T, Height, Width, DataShuffle::transpose, SubGroupSize, ArraySize>
       >::type cast() {
     return {registerImage_};
   }
@@ -356,9 +356,9 @@ private:
 //
 template <typename T, int Width, int Height,
          DataShuffle Transpose = DataShuffle::none,
-         int ArraySize = 1, int SubGroupSize = 16>
+         int SubGroupSize = 16, int ArraySize = 1>
 struct __ArrayMatrix {
-  using layout = InnerLayout<T, Width, Height, Transpose, ArraySize, SubGroupSize>;
+  using layout = InnerLayout<T, Width, Height, Transpose, SubGroupSize, ArraySize>;
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
 
@@ -420,7 +420,7 @@ struct __ArrayMatrix {
   template <DataShuffle reshuffle>
   inline typename std::enable_if<Transpose == DataShuffle::vnni
   && reshuffle == DataShuffle::none,
-    __ArrayMatrix<T, Width * 2, Height / 2, reshuffle, ArraySize, SubGroupSize>
+    __ArrayMatrix<T, Width * 2, Height / 2, reshuffle, SubGroupSize, ArraySize>
       >::type cast () {
     return {registerImage_};
   }
@@ -428,7 +428,7 @@ struct __ArrayMatrix {
   template <DataShuffle reshuffle>
   inline typename std::enable_if<Transpose == DataShuffle::transpose
   && reshuffle == DataShuffle::none,
-    __ArrayMatrix<T, Height, Width, reshuffle, ArraySize, SubGroupSize>
+    __ArrayMatrix<T, Height, Width, reshuffle, SubGroupSize, ArraySize>
       >::type cast() {
     return {registerImage_};
   }
@@ -436,7 +436,7 @@ struct __ArrayMatrix {
   template <DataShuffle reshuffle>
   inline typename std::enable_if<Transpose == DataShuffle::none
   && reshuffle == DataShuffle::vnni,
-    __ArrayMatrix<T, Width /2, Height * 2, reshuffle, ArraySize, SubGroupSize>
+    __ArrayMatrix<T, Width /2, Height * 2, reshuffle, SubGroupSize, ArraySize>
       >::type cast() {
     return {registerImage_};
   }
@@ -444,7 +444,7 @@ struct __ArrayMatrix {
   template <DataShuffle reshuffle>
   inline typename std::enable_if<Transpose == DataShuffle::none
   && reshuffle == DataShuffle::transpose,
-    __ArrayMatrix<T, Height, Width, DataShuffle::transpose, ArraySize, SubGroupSize>
+    __ArrayMatrix<T, Height, Width, DataShuffle::transpose, SubGroupSize, ArraySize>
       >::type cast() {
     return {registerImage_};
   }
@@ -464,9 +464,9 @@ private:
 // __RawMatrix for workaround IGC dpas type requirement if alias doesn't work
 template <typename T, int Width, int Height,
          DataShuffle Transpose = DataShuffle::none,
-         int ArraySize = 1, int SubGroupSize = 16>
+         int SubGroupSize = 16 int ArraySize = 1>
 struct __RawMatrix {
-  using layout = InnerLayout<T, Width, Height, Transpose, ArraySize, SubGroupSize>;
+  using layout = InnerLayout<T, Width, Height, Transpose, SubGroupSize, ArraySize>;
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
 
@@ -526,7 +526,7 @@ struct __RawMatrix {
   template <DataShuffle reshuffle>
   inline typename std::enable_if<Transpose == DataShuffle::vnni
   && reshuffle == DataShuffle::none,
-    __RawMatrix<T, Width * 2, Height / 2, reshuffle, ArraySize, SubGroupSize>
+    __RawMatrix<T, Width * 2, Height / 2, reshuffle, SubGroupSize, ArraySize>
       >::type cast () {
     return {registerImage_};
   }
@@ -534,7 +534,7 @@ struct __RawMatrix {
   template <DataShuffle reshuffle>
   inline typename std::enable_if<Transpose == DataShuffle::transpose
   && reshuffle == DataShuffle::none,
-    __RawMatrix<T, Height, Width, reshuffle, ArraySize, SubGroupSize>
+    __RawMatrix<T, Height, Width, reshuffle, SubGroupSize, ArraySize>
       >::type cast() {
     return {registerImage_};
   }
@@ -542,7 +542,7 @@ struct __RawMatrix {
   template <DataShuffle reshuffle>
   inline typename std::enable_if<Transpose == DataShuffle::none
   && reshuffle == DataShuffle::vnni,
-    __RawMatrix<T, Width /2, Height * 2, reshuffle, ArraySize, SubGroupSize>
+    __RawMatrix<T, Width /2, Height * 2, reshuffle, SubGroupSize, ArraySize>
       >::type cast() {
     return {registerImage_};
   }
@@ -550,7 +550,7 @@ struct __RawMatrix {
   template <DataShuffle reshuffle>
   inline typename std::enable_if<Transpose == DataShuffle::none
   && reshuffle == DataShuffle::transpose,
-    __RawMatrix<T, Height, Width, DataShuffle::transpose, ArraySize, SubGroupSize>
+    __RawMatrix<T, Height, Width, DataShuffle::transpose, SubGroupSize, ArraySize>
       >::type cast() {
     return {registerImage_};
   }

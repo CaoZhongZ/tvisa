@@ -461,10 +461,10 @@ static inline void lscStore(
 
 template <typename T, int Width, int Height,
          DataShuffle Transpose,
-         int ArraySize, int SubGroupSize>
+         int SubGroupSize int ArraySize>
 template <CacheCtrl CTL>
-inline __Matrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>&
-__Matrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>::load(
+inline __Matrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>&
+__Matrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>::load(
     const AddressPayload<Width, Height, ArraySize>& address
 ) {
   constexpr auto NumRegs = __Matrix::NumRegs;
@@ -475,10 +475,10 @@ __Matrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>::load(
 
 template <typename T, int Width, int Height,
          DataShuffle Transpose,
-         int ArraySize, int SubGroupSize>
+         int SubGroupSize int ArraySize>
 template <CacheCtrl CTL>
-inline __Matrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>&
-__Matrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>::store(
+inline __Matrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>&
+__Matrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>::store(
     const AddressPayload<Width, Height, ArraySize>& address
 ) {
   constexpr auto NumRegs = __Matrix::NumRegs;
@@ -490,10 +490,10 @@ __Matrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>::store(
 
 template <typename T, int Width, int Height,
          DataShuffle Transpose,
-         int ArraySize, int SubGroupSize>
+         int SubGroupSize int ArraySize>
 template <CacheCtrl CTL>
-inline __ArrayMatrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>&
-__ArrayMatrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>::load(
+inline __ArrayMatrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>&
+__ArrayMatrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>::load(
     const AddressPayload<Width, Height, ArraySize>& address
 ) {
   constexpr auto NumRegs = __ArrayMatrix::NumRegs;
@@ -504,10 +504,10 @@ __ArrayMatrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>::load(
 
 template <typename T, int Width, int Height,
          DataShuffle Transpose,
-         int ArraySize, int SubGroupSize>
+         int SubGroupSize int ArraySize>
 template <CacheCtrl CTL>
-inline __ArrayMatrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>&
-__ArrayMatrix<T, Width, Height, Transpose, ArraySize, SubGroupSize>::store(
+inline __ArrayMatrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>&
+__ArrayMatrix<T, Width, Height, Transpose, SubGroupSize, ArraySize>::store(
     const AddressPayload<Width, Height, ArraySize>& address
 ) {
   constexpr auto NumRegs = __ArrayMatrix::NumRegs;
