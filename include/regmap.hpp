@@ -186,7 +186,7 @@ private:
 };
 
 #else
-template <int BlockWidth, int BlockHeight, int ArrayLength = 1>
+template <int BlockHeight, int BlockWidth, int ArrayLength = 1>
 struct AddressPayload;
 
 struct BarrierPayload;
