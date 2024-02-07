@@ -26,17 +26,17 @@ static inline sycl::id<2> get_subgroup_linear_no(sycl::nd_item<2> pos) {
 //
 // Each canvas dimension shouldn't beyond 16MB
 //
-template <typename T, int BW, int BH, int SG_SZ>
+template <typename T, int BH, int BW, int SG_SZ>
 struct test_tile_load {
   test_tile_load(
       T* dst, const T* src,
-      int surfaceW, int surfaceH, int surfaceP
+      int surfaceH, int surfaceW, int surfaceP
   ) : src(src), dst(dst),
     surfaceH(surfaceH), surfaceW(surfaceW),
     surfaceP(surfaceP)
   {}
 
-  using matrix = __Matrix<T, BW, BH, DataShuffle::none, SG_SZ>;
+  using matrix = __Matrix<T, BH, BW, DataShuffle::none, SG_SZ>;
 
   void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (
       sycl::nd_item<2> pos
@@ -47,8 +47,8 @@ struct test_tile_load {
     int x_off = subgroup_id[1] * BW;
     int y_off = subgroup_id[0] * BH;
 
-    AddressPayload<BW, BH> adrs(
-      src, surfaceW, surfaceH, surfaceP, x_off, y_off
+    AddressPayload<BH, BW> adrs(
+      src, surfaceH, surfaceW, surfaceP, x_off, y_off
     );
     matrix tmp;
     tmp.zero();
@@ -67,22 +67,22 @@ struct test_tile_load {
 private:
   T* dst;
   const T* src;
-  int surfaceW;
   int surfaceH;
+  int surfaceW;
   int surfaceP;
 };
 
-template <typename T, int BW, int BH, int SG_SZ>
+template <typename T, int BH, int BW, int SG_SZ>
 struct test_tile_store {
   test_tile_load(
       T* dst, const T* src,
-      int surfaceW, int surfaceH, int surfaceP
+      int surfaceH, int surfaceW, int surfaceP
   ) : src(src), dst(dst),
     surfaceH(surfaceH), surfaceW(surfaceW),
     surfaceP(surfaceP)
   {}
 
-  using matrix = __Matrix<T, BW, BH, DataShuffle::none, SG_SZ>;
+  using matrix = __Matrix<T, BH, BW, DataShuffle::none, SG_SZ>;
 
   void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (
       sycl::nd_item<2> pos
@@ -94,7 +94,7 @@ struct test_tile_store {
     int y_off = subgroup_id[0] * BH;
 
     AddressPayload<BW, BH> adrs(
-      dst, surfaceW, surfaceH, surfaceP, x_off, y_off
+      dst, surfaceH, surfaceW, surfaceP, x_off, y_off
     );
     matrix tmp;
 
@@ -120,7 +120,7 @@ private:
 //
 // Ideally test range should be
 // type: int8_t, sycl::half, float, uint64_t
-// Block width: 1 - 16 lane, interpreted by data-type
 // Block height: 1 - 32
+// Block width: 1 - 16 lane, interpreted by data-type
 // Sub-group SZ: 16, 32
 //
