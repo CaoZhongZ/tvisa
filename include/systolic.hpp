@@ -35,8 +35,8 @@ template <
   template <int M> static inline void run(
       __Matrix<OT, M, N, DataShuffle::none>& C,   /* dst */
       __Matrix<AccumT, M, N, DataShuffle::none>& Accum, /* src0 */
-      __Matrix<IT1, K, M, DataShuffle::none>& A,  /* src2 */
-      __Matrix<IT2, N, K, DataShuffle::vnni>& B   /* src1 */
+      __Matrix<IT1, M, K, DataShuffle::none>& A,  /* src2 */
+      __Matrix<IT2, K, N, DataShuffle::vnni>& B   /* src1 */
   );
 };
 
@@ -55,18 +55,18 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
   static constexpr int N = Width * Src1ElemsPerChan; /* 16 */
 
   template <int M> static inline void run(
-      __Matrix<OT, N, M, DataShuffle::none>&,
-      __Matrix<AccumT, N, M, DataShuffle::none>&,
-      __Matrix<sycl::half, K, M, DataShuffle::none>&,
-      __Matrix<sycl::half, N, K, DataShuffle::vnni>&
+      __Matrix<OT, M, N, DataShuffle::none>&,
+      __Matrix<AccumT, M, N, DataShuffle::none>&,
+      __Matrix<sycl::half, M, K, DataShuffle::none>&,
+      __Matrix<sycl::half, K, N, DataShuffle::vnni>&
   );
 
 #define GenRepeat(M)  \
   template <> static inline void run<M>(  \
-      __Matrix<OT, N, M, DataShuffle::none>& C,   /* dst */  \
-      __Matrix<AccumT, N, M, DataShuffle::none>& Accum, /* src0 */ \
-      __Matrix<sycl::half, K, M, DataShuffle::none>& A,  /* src2 */ \
-      __Matrix<sycl::half, N, K, DataShuffle::vnni>& B   /* src1 */ \
+      __Matrix<OT, M, N, DataShuffle::none>& C,   /* dst */  \
+      __Matrix<AccumT, M, N, DataShuffle::none>& Accum, /* src0 */ \
+      __Matrix<sycl::half, M, K, DataShuffle::none>& A,  /* src2 */ \
+      __Matrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */ \
   ) { \
     asm volatile ("{\n"  \
         ".decl aliasA v_type=G type=d num_elts=64 align=GRF alias=<%2,0>\n" \
@@ -81,10 +81,10 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
 // Compiler generate shuffle when reinterpret half8 to int4. Wierd, need to confirm
 // #define GenRepeat(M)  \
 //   template <> static inline void run<M>(  \
-//       __Matrix<OT, N, M, DataShuffle::none>& C,   /* dst */  \
-//       __Matrix<AccumT, N, M, DataShuffle::none>& Accum, /* src0 */ \
-//       __Matrix<sycl::half, K, M, DataShuffle::none>& A,  /* src2 */ \
-//       __Matrix<sycl::half, N, K, DataShuffle::vnni>& B   /* src1 */ \
+//       __Matrix<OT, M, N, DataShuffle::none>& C,   /* dst */  \
+//       __Matrix<AccumT, M, N, DataShuffle::none>& Accum, /* src0 */ \
+//       __Matrix<sycl::half, M, K, DataShuffle::none>& A,  /* src2 */ \
+//       __Matrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */ \
 //   ) { \
 //     asm volatile ("{\n"  \
 //         "dpas.hf.hf.8." str(M) " (M1, 16) %0.0 %1.0 %3.0 %2(0, 0)\n"  \
@@ -123,16 +123,16 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
 //   template <int M> static inline void run(
 //       __Matrix<OT, M, N, DataShuffle::none>&,
 //       __Matrix<AccumT, M, N, DataShuffle::none>&,
-//       __Matrix<bf16, K, M, DataShuffle::none>&,
-//       __Matrix<bf16, N, K, DataShuffle::vnni>&
+//       __Matrix<bf16, M, K, DataShuffle::none>&,
+//       __Matrix<bf16, K, N, DataShuffle::vnni>&
 //   );
 //
 // #define GenRepeat(M)  \
 //   template <> static inline void run<M>(  \
 //       __Matrix<OT, M, N, DataShuffle::none>& C,   /* dst */  \
 //       __Matrix<AccumT, M, N, DataShuffle::none>& Accum, /* src0 */ \
-//       __Matrix<bf16, K, M, DataShuffle::none>& A,  /* src2 */ \
-//       __Matrix<bf16, N, K, DataShuffle::vnni>& B   /* src1 */ \
+//       __Matrix<bf16, M, K, DataShuffle::none>& A,  /* src2 */ \
+//       __Matrix<bf16, K, N, DataShuffle::vnni>& B   /* src1 */ \
 //   ) { \
 //     asm volatile ("\n"  \
 //         "dpas.bf.bf.8." str(M) " (M1, 16) %0.0 %1.0 %3.0 %2(0, 0)\n"  \
@@ -163,8 +163,8 @@ template <
   typename IT2,
   typename config = systolic_config>
 static inline void dpas(
-    __Matrix<OT, N, M>& D, __Matrix<AccumT, N, M>& C,
-    __Matrix<IT1, K, M>& A, __Matrix<IT2, N, K, DataShuffle::vnni>& B
+    __Matrix<OT, M, N>& D, __Matrix<AccumT, M, N>& C,
+    __Matrix<IT1, M, K>& A, __Matrix<IT2, K, N, DataShuffle::vnni>& B
 ) {
   // TODO: check accepted parameters with static assert;
   Dpas<OT, AccumT, IT1, IT2, systolic_config>::template run<M>(D, C, A, B);
