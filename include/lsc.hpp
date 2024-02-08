@@ -65,26 +65,26 @@ static inline void lscStore(void* addr, const sycl::vec<T, N>& var) {
 // lscLoad<CacheCtrl::L1UC_L3UC>(M, address);
 //
 template <CacheCtrl CTL= CacheCtrl::DEFAULT,
-    typename T, int BlockHeight, int BlockWidth, DataShuffle Transpose>
+    typename T, int BlockHeight, int BlockWidth, DataShuffle Transpose, int SubGroupSize=16>
 static inline void lscLoad(
-    __Matrix<T, BlockHeight, BlockWidth, Transpose>& M,
+    __Matrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>& M,
     const AddressPayload<BlockHeight, BlockWidth>& address
 ) {
-  constexpr auto NumRegs = __Matrix<T, BlockHeight, BlockWidth, Transpose>::NumRegs;
-  constexpr auto DataWidth = __Matrix<T, BlockHeight, BlockWidth, Transpose>::LSCWidth;
-  RawSendLoad<DataWidth, NumRegs, Transpose, CTL>::run(M.getStorage(), address);
+  constexpr auto PhyNumRegs = __Matrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>::PhyNumRegs;
+  constexpr auto DataWidth = __Matrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>::LSCWidth;
+  RawSendLoad<DataWidth, PhyNumRegs, Transpose, CTL>::run(M.getStorage(), address);
 }
 
 template <CacheCtrl CTL= CacheCtrl::DEFAULT,
-    typename T, int BlockHeight, int BlockWidth, DataShuffle Transpose>
+    typename T, int BlockHeight, int BlockWidth, DataShuffle Transpose, int SubGroupSize=16>
 static inline void lscStore(
     AddressPayload<BlockHeight, BlockWidth>& address,
-    const __Matrix<T, BlockHeight, BlockWidth, Transpose>& M
+    const __Matrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>& M
 ) {
-  constexpr auto NumRegs = __Matrix<T, BlockHeight, BlockWidth, Transpose>::NumRegs;
+  constexpr auto PhyNumRegs = __Matrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>::PhyNumRegs;
   constexpr auto DataWidth = Log2<sizeof(T)>();
   static_assert(Transpose == DataShuffle::none, "Store support only none shuffled matrix");
-  RawSendStore<DataWidth, NumRegs, Transpose, CTL>::run(address, M.getStorage());
+  RawSendStore<DataWidth, PhyNumRegs, Transpose, CTL>::run(address, M.getStorage());
 }
 
 template <typename T, int Height, int Width,

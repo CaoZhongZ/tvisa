@@ -202,9 +202,11 @@ private:
   static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
   static constexpr int PaddedWidth = 1 << Log2Ceiling<sizeof(T) * Width>();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
+  static constexpr int PhyRegSize = 64; 
   static constexpr int AllocSize = PaddedWidth * Height * ArraySize;
 public:
   static constexpr int NumRegs = (AllocSize + RegSize -1) / RegSize;
+  static constexpr int PhyNumRegs = (AllocSize + PhyRegSize - 1) / PhyRegSize;
   static constexpr int N = NumRegs * NElemsPerLane;
   static constexpr int LSCWidth = Log2<sizeof(T)>();
 };
@@ -251,6 +253,7 @@ template <typename T, int Height, int Width,
          int SubGroupSize = 16, int ArraySize = 1>
 struct __Matrix {
   using layout = InnerLayout<T, Height, Width, Transpose, SubGroupSize, ArraySize>;
+  static constexpr int PhyNumRegs = layout::PhyNumRegs;
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
   static constexpr int LSCWidth = layout::LSCWidth;
