@@ -86,7 +86,7 @@ test_execs=good_2d_load_store lsc_uncache_32_and_16 test_2dblock_matrix \
 					 test_packRegPayload broken_2d_load_store lsc_64to32x2_notrans test_2dblock_fp16 \
 					 test_packRegPayloadClass
 
-% : %.o sycl_misc.o
+good_2d_load_store : %.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
 all : $(test_execs)
