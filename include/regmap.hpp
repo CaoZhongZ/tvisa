@@ -222,7 +222,7 @@ private:
   static constexpr int RegSize = SubGroupSize * sizeof(int);
   static constexpr int AllocSize = Width * PaddedHeight * ArraySize;
   static constexpr int PhyRegSize = 64;
-  static_assert(Height * sizeof(T) < PhyRegSize, "No register space for transpose");
+  static_assert(Height * sizeof(T) <= PhyRegSize, "No register space for transpose");
 public:
   static constexpr int NumRegs = (AllocSize + RegSize -1)/ RegSize;
   static constexpr int PhyNumRegs = (AllocSize + PhyRegSize -1) / PhyRegSize;
@@ -242,7 +242,7 @@ private:
   static constexpr int RegSize = SubGroupSize * sizeof(int);
   static constexpr int AllocSize = PaddedWidth * PaddedHeight * ArraySize;
   static constexpr int PhyRegSize = 64;
-  static_assert(Width * sizeof(int) < PhyRegSize, "No register space for VNNI transform");
+  static_assert(Width * sizeof(int) <= PhyRegSize, "No register space for VNNI transform");
 public:
   static constexpr int NumRegs = (AllocSize + RegSize -1) / RegSize;
   static constexpr int PhyNumRegs = (AllocSize + PhyRegSize -1) / PhyRegSize;
