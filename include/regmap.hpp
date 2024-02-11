@@ -202,7 +202,7 @@ private:
   static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
   static constexpr int PaddedWidth = 1 << Log2Ceiling<sizeof(T) * Width>();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
-  static constexpr int PhyRegSize = 64; 
+  static constexpr int PhyRegSize = 64;
   static constexpr int AllocSize = PaddedWidth * Height * ArraySize;
 public:
   static constexpr int NumRegs = (AllocSize + RegSize -1) / RegSize;
@@ -221,8 +221,11 @@ private:
   static constexpr int PaddedHeight = LowBound<1 << Log2Ceiling<sizeof(T) * Height>(), 4 >();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
   static constexpr int AllocSize = Width * PaddedHeight * ArraySize;
+  static constexpr int PhyRegSize = 64;
+  static_assert(Height * sizeof(T) < PhyRegSize, "No register space for transpose");
 public:
   static constexpr int NumRegs = (AllocSize + RegSize -1)/ RegSize;
+  static constexpr int PhyNumRegs = (AllocSize + PhyRegSize -1) / PhyRegSize;
   static constexpr int N = NumRegs * NElemsPerLane;
   static constexpr int LSCWidth = LowBound<Log2<sizeof(T)>(), 2>();
 };
@@ -238,8 +241,11 @@ private:
   static constexpr int PaddedWidth = 1 << Log2Ceiling<sizeof(T) * Width>();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
   static constexpr int AllocSize = PaddedWidth * PaddedHeight * ArraySize;
+  static constexpr int PhyRegSize = 64;
+  static_assert(Width * sizeof(int) < PhyRegSize, "No register space for VNNI transform");
 public:
   static constexpr int NumRegs = (AllocSize + RegSize -1) / RegSize;
+  static constexpr int PhyNumRegs = (AllocSize + PhyRegSize -1) / PhyRegSize;
   static constexpr int N = NumRegs * NElemsPerLane;
   static constexpr int LSCWidth = Log2<sizeof(T)>();
   static_assert(LSCWidth < 2, "VNNI only makes sense on less than 16-bit");
