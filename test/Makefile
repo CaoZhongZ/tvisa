@@ -27,7 +27,7 @@ OFFLOAD=sycl-spir64_gen-unknown-unknown
 endif
 
 V=
-CXXFLAGS=-std=c++17 $(OPT_FLAGS) -Wall -Wno-deprecated-declarations -Wno-unused-variable -Wno-vla-cxx-extension -I../include
+CXXFLAGS=-std=c++17 $(OPT_FLAGS) -Wall -Wno-deprecated-declarations -Wno-unused-variable -Wno-vla-cxx-extension -I../include -I..
 SYCLFLAGS=-fsycl -fsycl-id-queries-fit-in-int -fsycl-default-sub-group-size=16 -D__SYCL_INTERNAL_API -fsycl-targets=$(TARGET)
 LINKFLAGS=$(OPT_FLAGS) -fsycl -fsycl-max-parallel-link-jobs=8 -fsycl-targets=$(TARGET) $(LINKTARGET)
 
@@ -86,7 +86,10 @@ test_execs=good_2d_load_store lsc_uncache_32_and_16 test_2dblock_matrix \
 					 test_packRegPayload broken_2d_load_store lsc_64to32x2_notrans test_2dblock_fp16 \
 					 test_packRegPayloadClass
 
-good_2d_load_store : %.o ../sycl_misc.o
+good_2d_load_store : good_2d_load_store.o ../sycl_misc.o
+	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
+
+lsc_uncache_32_and_16 : lsc_uncache_32_and_16.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
 all : $(test_execs)

@@ -148,6 +148,8 @@ int main(int argc, char *argv[]) {
   linear_copy<uint32_t>::verify(b_check, b_host, 3, nelems);
 
   // -------------------------------------------------------------
+  // this test is not in target
+  /*
   nelems = alloc_size / sizeof(sycl::half);
   fill_sequential((sycl::half *)b_host, 1, alloc_size / sizeof(sycl::half));
 
@@ -165,6 +167,7 @@ int main(int argc, char *argv[]) {
   queue.memcpy(b_check, dst, alloc_size);
   queue.wait();
   linear_copy<sycl::half>::verify(b_check, b_host, 3.1, nelems);
+  */
 
   queue.fill<sycl::half>(dst, 2.5, nelems);
   queue.wait(); // flush the cache, because we are ready to use non-cache load/store
