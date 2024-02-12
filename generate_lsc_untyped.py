@@ -78,12 +78,12 @@ class DataWidth(Enum):
     d64 = 8
 
 def generate_lsc_untyped(filename, op):
-    vecmap = {1:'', 2:'x2', 4:'x4'}
+    vecmap = {1:'', 2:'x2', 4:'x4', 8:'x8'}
     datamap = {1 :'d8c32', 2:'d16c32', 4:'d32', 8:'d64'}
 
     with open(filename, 'w') as file:
         for data_size in [1,2,4,8]:
-            for vec_size in [1,2,4] if data_size < 8 else [1, 2]:
+            for vec_size in [1,2,4,8] if data_size < 8 else [1, 2]:
                 actual_size = data_size * vec_size
                 actual_vec = 1
 
