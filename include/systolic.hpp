@@ -32,6 +32,7 @@ template <
   static constexpr int K = Depth * OpsPerChan;
   static constexpr int N = Width * Src1ElemsPerChan;
 
+// TODO: DataShuffle of A can be any
   template <int M> static inline void run(
       __Matrix<OT, M, N, DataShuffle::none>& C,   /* dst */
       __Matrix<AccumT, M, N, DataShuffle::none>& Accum, /* src0 */
@@ -161,12 +162,14 @@ template <
   typename AccumT,
   typename IT1,
   typename IT2,
+  int SubGroupSize,
   typename config = systolic_config>
 static inline void dpas(
-    __Matrix<OT, M, N>& D, __Matrix<AccumT, M, N>& C,
-    __Matrix<IT1, M, K>& A, __Matrix<IT2, K, N, DataShuffle::vnni>& B
+    __Matrix<OT, M, N, DataShuffle::none, SubGroupSize>& D, __Matrix<AccumT, M, N, DataShuffle::none, SubGroupSize>& C,
+    __Matrix<IT1, M, K,  DataShuffle::none, SubGroupSize>& A, __Matrix<IT2, K, N, DataShuffle::vnni, SubGroupSize>& B
 ) {
   // TODO: check accepted parameters with static assert;
+  static_assert(SubGroupSize == 16, "SubGroupSize for dpas must be 16");
   Dpas<OT, AccumT, IT1, IT2, systolic_config>::template run<M>(D, C, A, B);
 }
 
