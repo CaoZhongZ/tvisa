@@ -95,9 +95,9 @@ inline __Matrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>&
 __Matrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>::load(
     const AddressPayload<Height, Width, ArraySize>& address
 ) {
-  constexpr auto NumRegs = __Matrix::NumRegs;
+  constexpr auto PhyNumRegs = __Matrix<T, Height, Width, Transpose, SubGroupSize>::PhyNumRegs;
   constexpr auto DataWidth = __Matrix::LSCWidth;
-  RawSendLoad<DataWidth, NumRegs, Transpose, CTL>::run(this->getStorage(), address);
+  RawSendLoad<DataWidth, PhyNumRegs, Transpose, CTL>::run(this->getStorage(), address);
   return *this;
 }
 
@@ -109,10 +109,10 @@ inline __Matrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>&
 __Matrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>::store(
     const AddressPayload<Height, Width, ArraySize>& address
 ) {
-  constexpr auto NumRegs = __Matrix::NumRegs;
+  constexpr auto PhyNumRegs = __Matrix<T, Height, Width, Transpose, SubGroupSize>::PhyNumRegs;
   constexpr auto DataWidth = Log2<sizeof(T)>();
   static_assert(Transpose == DataShuffle::none, "Store support only none shuffled matrix");
-  RawSendStore<DataWidth, NumRegs, Transpose, CTL>::run(address, this->getStorage());
+  RawSendStore<DataWidth, PhyNumRegs, Transpose, CTL>::run(address, this->getStorage());
   return *this;
 }
 

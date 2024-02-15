@@ -273,20 +273,33 @@ struct __Matrix {
   inline const typename sycl::vec<T, N>::vector_t& getStorage() const {
     return reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(registerImage_);
   }
+  inline typename sycl::vec<T, N>& getImage() {
+    return registerImage_;
+  }
+  inline const typename sycl::vec<T, N>& getImage() const {
+    return registerImage_;
+  }
 
   /* XXX: Generate unecessary copy, WTF??? */
-  inline typename rawType::vector_t& getRawStorage() {
-    return reinterpret_cast<typename rawType::vector_t&>(registerImage_);
-  }
-  inline const typename rawType::vector_t& getRawStorage() const {
-    return reinterpret_cast<const typename rawType::vector_t&>(registerImage_);
-  }
+  // inline typename rawType::vector_t& getRawStorage() {
+  //   return reinterpret_cast<typename rawType::vector_t&>(registerImage_);
+  // }
+  // inline const typename rawType::vector_t& getRawStorage() const {
+  //   return reinterpret_cast<const typename rawType::vector_t&>(registerImage_);
+  // }
 
   __Matrix() = default;
   __Matrix(const sycl::vec<T, N>& rh) : registerImage_(rh) {}
   __Matrix(sycl::vec<T, N>&& rh) : registerImage_(std::move(rh)) {}
   __Matrix(const __Matrix &rh) : registerImage_(rh.registerImage_) {}
   __Matrix(__Matrix&& rh) : registerImage_(std::move(rh.registerImage_)) {}
+  
+  template<typename SrcT>
+  __Matrix(const __Matrix<SrcT, Height, Width, Transpose, SubGroupSize, ArraySize> &rh) {
+    #pragma  unroll
+    for(int i=0; i<N; ++i)
+      registerImage_[i] = static_cast<T>((rh.getImage())[i]);
+  }
 
   inline __Matrix& operator = (__Matrix&& rh) {
     registerImage_ = std::move(rh.registerImage_);
@@ -353,7 +366,7 @@ struct __Matrix {
   // two instructions for single register operation.
   //
   inline void zero() {
-    registerImage_ =0;
+    registerImage_ = 0;
   }
 
 private:
