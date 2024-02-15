@@ -95,15 +95,7 @@ void verify_result(const T* actual_result, const T* srcA, const T* srcB, int M, 
   }  
   
   std::vector<float> expected(M * N, 0);
-  
-  for(int i=0; i<M; ++i){
-    for(int j=0; j<N; ++j){
-      for(int k=0; k<K; ++k){
-        expected[i * N + j] += a[i * K + k] * b[k * N + j];
-      }
-    }
-  }
-  // cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, a.data(), K, b.data(), N, 0, expected.data(), N);
+  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, a.data(), K, b.data(), N, 0, expected.data(), N);
   
   bool res = all_close(actual_result, ldc, expected.data(), N, M, N);
   if (res) 
