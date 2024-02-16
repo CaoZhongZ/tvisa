@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CL/cl_platform.h"
 #include <sycl/sycl.hpp>
 
 // TODO: move somewhere else
@@ -381,6 +382,7 @@ template <typename T, int Height, int Width,
          int SubGroupSize = 16, int ArraySize = 1>
 struct __ArrayMatrix {
   using layout = InnerLayout<T, Height, Width, Transpose, SubGroupSize, ArraySize>;
+  static constexpr int PhyNumRegs = layout::PhyNumRegs;  
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
   static constexpr int LSCWidth = layout::LSCWidth;
@@ -396,15 +398,32 @@ struct __ArrayMatrix {
   }
   */
 
-  typedef T (& array_ref) [N];
-  typedef const T (& const_array_ref) [N];
 
-  inline array_ref getStorage() {
+#if 0
+  typedef __attribute__((ext_vector_type(N))) T storege_type;
+  inline storege_type& getStorage() {
+    return reinterpret_cast<storege_type&>(registerImage_);
+  }
+  inline const storege_type& getStorage() const {
+    return reinterpret_cast<const storege_type&>(registerImage_);
+  }
+#else    
+  inline std::array<T, N>& getStorage() {
     return registerImage_;
   }
-  inline const_array_ref getStorage() const {
+  inline const std::array<T, N>&  getStorage() const {
+    return registerImage_;
+  }  
+#endif  
+  typedef std::array<T, N>& array_ref;
+  typedef const std::array<T, N>& const_array_ref;
+  
+  inline array_ref getImage() {
     return registerImage_;
   }
+  inline const_array_ref getImage() const {
+    return registerImage_;
+  }  
 
   __ArrayMatrix() = default;
   __ArrayMatrix(const T (&rh)[N]) {
@@ -481,7 +500,7 @@ struct __ArrayMatrix {
   }
 
 private:
-  T registerImage_[N];
+  std::array<T, N> registerImage_;
 };
 
 // __RawMatrix for workaround IGC dpas type requirement if alias doesn't work

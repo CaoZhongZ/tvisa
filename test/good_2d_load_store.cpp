@@ -92,27 +92,25 @@ template <int Height, int Width, typename T> struct vnni_test {
     int x_off = 0;
     int y_off = index / SG_SZ * Height;
 
-    __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp0;
+    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp0;
     AddressPayload<Height, Width> address_payload_0(
         (void *)src, surfaceH, surfaceW, surfaceP, x_off, y_off);
     lscLoad<CacheCtrl::L1UC_L3UC>(tmp0, address_payload_0);
 
-    __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> ret;
-    sycl::vec<T, __Matrix<T, Height, Width, DataShuffle::none, SG_SZ>::N>
-        image = tmp0.getImage();
-    ret.getImage() = image;
+    // __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> ret(tmp0);
+    // ret = tmp0;
 
-    if (index == 0) {
-      constexpr int N = __Matrix<T, Height, Width, DataShuffle::none, SG_SZ>::N;
-      for (int i = 0; i < N; ++i) {
-        sycl::ext::oneapi::experimental::printf(fmt, float(image[i]));
-      }
-      sycl::ext::oneapi::experimental::printf(fmt_end);
-    }
+    // if (index == 0) {
+    //   constexpr int N = __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ>::N;
+    //   for (int i = 0; i < N; ++i) {
+    //     sycl::ext::oneapi::experimental::printf(fmt, float(tmp0.getImage()[i]));
+    //   }
+    //   sycl::ext::oneapi::experimental::printf(fmt_end);
+    // }
 
     AddressPayload<Height, Width> address_payload_1(
         (void *)dst, surfaceH, surfaceW, surfaceP, x_off, y_off);
-    lscStore<CacheCtrl::L1WB_L3WB>(address_payload_1, ret);
+    lscStore<CacheCtrl::L1WB_L3WB>(address_payload_1, tmp0);
 #else
     dst[index] += src[index];
 #endif
@@ -162,7 +160,7 @@ int main(int argc, char *argv[]) {
     sycl::free(b_host, queue);
     sycl::free(b_check, queue);
   });
-  typedef sycl::half InT;
+  typedef cl_half InT;
 
   fill_sequential((InT *)b_host, 0., alloc_size / sizeof(InT));
   queue.memcpy(src, b_host, alloc_size);
