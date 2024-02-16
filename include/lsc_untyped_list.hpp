@@ -63,7 +63,7 @@ struct LscStore {
 template <> struct LscLoad<DataWidth, VectorSize, SubGroupSize, CacheCtrl> { \
   template <typename T> static inline void run(T& var, const void* addr) { \
     asm volatile ("\n"  \
-        "lsc_load.ugm." str(CacheStr) " (M1, 16) %0:" str(DtypeStr) " flat[%1]:a64\n" \
+        "lsc_load.ugm." str(CacheStr) " (M1, " str(SubGroupSize) ") %0:" str(DtypeStr) " flat[%1]:a64\n" \
         : "=rw"(var) : "rw"(addr)); \
   } \
 };
@@ -75,7 +75,7 @@ template <> struct LscLoad<DataWidth, VectorSize, SubGroupSize, CacheCtrl> { \
 template <> struct LscStore<DataWidth, VectorSize, SubGroupSize, CacheCtrl> { \
   template <typename T> static inline void run(void *addr, const T& var) {  \
     asm volatile ("\n"  \
-        "lsc_store.ugm." str(CacheStr) " (M1, 16) flat[%0]:a64 %1:" str(DtypeStr) "\n" \
+        "lsc_store.ugm." str(CacheStr) " (M1, " str(SubGroupSize) ") flat[%0]:a64 %1:" str(DtypeStr) "\n" \
         :: "rw"(addr), "rw"(var));  \
   } \
 };
