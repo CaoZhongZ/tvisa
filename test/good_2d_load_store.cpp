@@ -55,8 +55,8 @@ template <int Height, int Width, typename T> struct tile_accumulate {
     int x_off = 0;
     int y_off = index / SG_SZ * Height;
 
-    __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp0;
-    __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp1;
+    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp0;
+    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp1;
     AddressPayload<Height, Width> address_payload_0(
         (void *)src, surfaceH, surfaceW, surfaceP, x_off, y_off);
     AddressPayload<Height, Width> address_payload_1(
@@ -64,7 +64,7 @@ template <int Height, int Width, typename T> struct tile_accumulate {
     lscLoad(tmp0, address_payload_0);
     lscLoad(tmp1, address_payload_1);
 
-    __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> ret = tmp0 + tmp1;
+    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> ret = tmp0 + tmp1;
 
     lscStore<CacheCtrl::L1WB_L3WB>(address_payload_1, ret);
 #else
@@ -92,25 +92,17 @@ template <int Height, int Width, typename T> struct vnni_test {
     int x_off = 0;
     int y_off = index / SG_SZ * Height;
 
-    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp0;
+    __ArrayMatrix<T, Height, Width, DataShuffle::vnni, SG_SZ> tmp0;
     AddressPayload<Height, Width> address_payload_0(
         (void *)src, surfaceH, surfaceW, surfaceP, x_off, y_off);
     lscLoad<CacheCtrl::L1UC_L3UC>(tmp0, address_payload_0);
 
-    // __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> ret(tmp0);
-    // ret = tmp0;
-
-    // if (index == 0) {
-    //   constexpr int N = __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ>::N;
-    //   for (int i = 0; i < N; ++i) {
-    //     sycl::ext::oneapi::experimental::printf(fmt, float(tmp0.getImage()[i]));
-    //   }
-    //   sycl::ext::oneapi::experimental::printf(fmt_end);
-    // }
+    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> ret;
+    ret.getStorage() = tmp0.getStorage();
 
     AddressPayload<Height, Width> address_payload_1(
         (void *)dst, surfaceH, surfaceW, surfaceP, x_off, y_off);
-    lscStore<CacheCtrl::L1WB_L3WB>(address_payload_1, tmp0);
+    lscStore<CacheCtrl::L1WB_L3WB>(address_payload_1, ret);
 #else
     dst[index] += src[index];
 #endif
@@ -187,7 +179,7 @@ int main(int argc, char *argv[]) {
   std::cout << "Num. of block: " << blocks << std::endl;
   queue.submit([&](sycl::handler &h) {
     h.parallel_for(sycl::nd_range<1>{blocks * SG_SZ, SG_SZ},
-                   vnni_test<ROW, COL, InT>(reinterpret_cast<InT *>(dst),
+                   tile_accumulate<ROW, COL, InT>(reinterpret_cast<InT *>(dst),
                                             reinterpret_cast<InT *>(src),
                                             tensorH, tensorW, tensorP));
   });
