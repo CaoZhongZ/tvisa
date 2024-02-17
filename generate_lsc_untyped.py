@@ -8,7 +8,17 @@ class DataShuffle(Enum):
 class StoreShuffle(Enum):
     none = 0
 
-class CacheCtrlNo(Enum):
+class CacheCtrlNoLoad(Enum):
+    DEFAULT = 0
+    L1UC_L3UC = 1
+    L1UC_L3C = 2
+    L1C_L3UC = 3
+    L1C_L3C = 4
+    L1S_L3UC = 5
+    L1S_L3C = 6
+    L1IAR_L3C = 7
+
+class CacheCtrlNoStore(Enum):
     DEFAULT = 0
     L1UC_L3UC = 1
     L1UC_L3WB = 2
@@ -18,11 +28,21 @@ class CacheCtrlNo(Enum):
     L1S_L3WB = 6
     L1WB_L3WB = 7
 
-class CacheCtrlStr(Enum):
+class CacheCtrlStrLoad(Enum):
+    DEFAULT = 'df.df'
+    L1UC_L3UC = 'uc.uc'
+    L1UC_L3C = 'uc.ca'
+    L1C_L3UC = 'ca.uc'
+    L1C_L3C = 'ca.ca'
+    L1S_L3UC = 'st.uc'
+    L1S_L3C = 'st.ca'
+    L1IAR_L3C = 'ra.ca'
+
+class CacheCtrlStrStore(Enum):
     DEFAULT = 'df.df'
     L1UC_L3UC = 'uc.uc'
     L1UC_L3WB = 'uc.wb'
-    L1WT_L3UC = 'ut.uc'
+    L1WT_L3UC = 'wt.uc'
     L1WT_L3WB = 'wt.wb'
     L1S_L3UC = 'st.uc'
     L1S_L3WB = 'st.wb'
@@ -56,10 +76,12 @@ def generate_rawsends(file_name, op):
         des_lens = range(1, 33)
         func_name = 'EnumerateLoads'
         shuffles = DataShuffle
+        cachectrl = CacheCtrlNoLoad
     elif op == 7:
         des_lens = range(1, 9)
         func_name = 'EnumerateStores'
         shuffles = StoreShuffle
+        cachectrl = CacheCtrlNoStore
 
     with open(file_name, 'w') as file:
         for shuf in shuffles:
@@ -69,7 +91,7 @@ def generate_rawsends(file_name, op):
                 data_sizes = [0, 1]
             else:
                 data_sizes = [0, 1, 2, 3]
-            encode_rawsends(op, shuf, data_sizes, des_lens, CacheCtrlNo, file)
+            encode_rawsends(op, shuf, data_sizes, des_lens, cachectrl, file)
 
 class DataWidth(Enum):
     d8c32 = 1
@@ -80,6 +102,10 @@ class DataWidth(Enum):
 def generate_lsc_untyped(filename, op):
     vecmap = {1:'', 2:'x2', 4:'x4', 8:'x8'}
     datamap = {1 :'d8c32', 2:'d16c32', 4:'d32', 8:'d64'}
+    if op == 'EnumerateLSCLoad':
+        cachectrl = CacheCtrlStrLoad
+    else:
+        cachectrl = CacheCtrlStrStore
 
     with open(filename, 'w') as file:
         for data_size in [1,2,4,8]:
@@ -95,20 +121,12 @@ def generate_lsc_untyped(filename, op):
                     actual_size = 8
 
                 for sg_sz in [16, 32]:
-                    for cache in CacheCtrlStr:
+                    for cache in cachectrl:
                         func_str = f"{op}({data_size}, {vec_size}, {sg_sz}, CacheCtrl::{cache.name}, {cache.value}, {datamap[actual_size]}{vecmap[actual_vec]});\n"
                         file.write(func_str)
                         # print(func_str)
 
 if __name__ == "__main__":
-    shuf = DataShuffle.none
-    cache = CacheCtrlNo.DEFAULT
-
-    op = 3
-    data_size = 2
-    den_len = 8
-    # base = generate_ecode(op, data_size, den_len, shuf, cache)
-    # print(hex(base))
     generate_rawsends('./include/list_raw_loads.list', 3)
     generate_rawsends('./include/list_raw_stores.list', 7)
     generate_lsc_untyped('./include/list_ugm_loads.list', 'EnumerateLSCLoad')
