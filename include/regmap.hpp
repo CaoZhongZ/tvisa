@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CL/cl_platform.h"
 #include <sycl/sycl.hpp>
 
 // TODO: move somewhere else
@@ -381,6 +382,7 @@ template <typename T, int Height, int Width,
          int SubGroupSize = 16, int ArraySize = 1>
 struct __ArrayMatrix {
   using layout = InnerLayout<T, Height, Width, Transpose, SubGroupSize, ArraySize>;
+  static constexpr int PhyNumRegs = layout::PhyNumRegs;  
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
   static constexpr int LSCWidth = layout::LSCWidth;
@@ -396,29 +398,24 @@ struct __ArrayMatrix {
   }
   */
 
-  typedef T (& array_ref) [N];
-  typedef const T (& const_array_ref) [N];
-
-  inline array_ref getStorage() {
-    return registerImage_;
+  typedef __attribute__((ext_vector_type(N))) T storage_type;
+  inline storage_type& getStorage() {
+    return reinterpret_cast<storage_type&>(registerImage_);
   }
-  inline const_array_ref getStorage() const {
-    return registerImage_;
+  inline const storage_type& getStorage() const {
+    return reinterpret_cast<const storage_type&>(registerImage_);
   }
 
   __ArrayMatrix() = default;
-  __ArrayMatrix(const T (&rh)[N]) {
-    memcpy(registerImage_, rh.registerImage_, sizeof(*this));
-  }
-
-  __ArrayMatrix(const __ArrayMatrix &rh) : __ArrayMatrix(rh.registerImage_) {}
+  __ArrayMatrix(const storage_type& rh): registerImage_(rh) {}
+  __ArrayMatrix(storage_type&& rh): registerImage_(std::move(rh)) {}
+  __ArrayMatrix(const __ArrayMatrix &rh) : registerImage_(rh.registerImage_) {}
 
   inline __ArrayMatrix& operator = (const __ArrayMatrix& rh) {
-    memcpy(registerImage_, rh.registerImage_, sizeof(*this));
+    registerImage_ = std::move(rh.registerImage_);    
     return *this;
   }
 
-  /* TODO: support
   inline __ArrayMatrix operator + (const __ArrayMatrix& m) {
     return { registerImage_ + m.registerImage_ };
   }
@@ -431,7 +428,6 @@ struct __ArrayMatrix {
   inline __ArrayMatrix operator / (const __ArrayMatrix& m) {
     return { registerImage_ * m.registerImage_ };
   }
-  */
 
   template <CacheCtrl CTL = CacheCtrl::DEFAULT>
   inline __ArrayMatrix& load(const AddressPayload<Height, Width, ArraySize> &address);
@@ -481,7 +477,7 @@ struct __ArrayMatrix {
   }
 
 private:
-  T registerImage_[N];
+  storage_type registerImage_;
 };
 
 // __RawMatrix for workaround IGC dpas type requirement if alias doesn't work
