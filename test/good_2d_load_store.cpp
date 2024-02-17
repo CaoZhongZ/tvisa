@@ -1,24 +1,13 @@
-#include <csignal>
 #include <iostream>
 #include <sycl/sycl.hpp>
 
 #include "cxxopts.hpp"
-#include "gen_visa_templates.hpp"
-#include "lsc.hpp"
 #include "sycl_misc.hpp"
+#include "gen_visa_templates.hpp"
 
 #define SG_SZ 16
 
-#ifdef __SYCL_DEVICE_ONLY__
-#define __SYCL_CONSTANT_AS __attribute__((opencl_constant))
-#else
-#define __SYCL_CONSTANT_AS
-#endif
-
-const __SYCL_CONSTANT_AS char fmt[] = " %f";
-const __SYCL_CONSTANT_AS char fmt_end[] = "\n";
-
-size_t parse_nelems(const std::string &nelems_string) {
+size_t parse_nelems(const std::string& nelems_string) {
   size_t base = 1;
   size_t pos = nelems_string.rfind("K");
   if (pos != std::string::npos) {
@@ -37,80 +26,47 @@ size_t parse_nelems(const std::string &nelems_string) {
   return stoull(nelems_string) * base;
 }
 
-template <typename T> void fill_sequential(T *p, int rank, size_t nelems) {
-  for (size_t i = 0; i < nelems; ++i) {
+template <typename T>
+void fill_sequential(T *p, int rank, size_t nelems) {
+  for (size_t i = 0; i < nelems; ++ i) {
     p[i] = i + rank;
   }
 }
 
-template <int Height, int Width, typename T> struct tile_accumulate {
-  tile_accumulate(T *dst, T *src, int surfaceH, int surfaceW, int surfaceP)
-      : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW),
-        surfaceP(surfaceP) {}
+template <int N, typename T>
+struct tile_accumulate {
+  tile_accumulate(T* dst, T* src, int surfaceH, int surfaceW, int surfaceP)
+    : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW), surfaceP(surfaceP)
+  {}
 
-  void operator()
-      [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::nd_item<1> item) const {
-    auto index = item.get_global_linear_id();
+  void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> index) const {
 #if defined(__SYCL_DEVICE_ONLY__)
+    int pseudo_pitch = surfaceP -1;
     int x_off = 0;
-    int y_off = index / SG_SZ * Height;
+    int y_off = index/SG_SZ * N;
+    int surface_height = surfaceH;
+    int surface_width = surfaceW -1;
 
-    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp0;
-    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp1;
-    AddressPayload<Height, Width> address_payload_0(
-        (void *)src, surfaceH, surfaceW, surfaceP, x_off, y_off);
-    AddressPayload<Height, Width> address_payload_1(
-        (void *)dst, surfaceH, surfaceW, surfaceP, x_off, y_off);
-    lscLoad(tmp0, address_payload_0);
-    lscLoad(tmp1, address_payload_1);
+    sycl::vec<T, N> tmp0;
+    sycl::vec<T, N> tmp1;
 
-    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> ret = tmp0 + tmp1;
+    lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+        tmp0, (void *)src, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
+    lscLoad<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+        tmp1, (void *)dst, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
 
-    lscStore<CacheCtrl::L1WB_L3WB>(address_payload_1, ret);
+    auto ret = tmp0 + tmp1;
+
+    lscStore<SG_SZ, DataShuffle::none, CacheCtrl::L1UC_L3UC>(
+        (void *)dst, ret, pseudo_pitch, N, pseudo_pitch, x_off, y_off);
 #else
     dst[index] += src[index];
 #endif
   }
 
 private:
-  T *src;
-  T *dst;
-  int surfaceH;
-  int surfaceW;
-  int surfaceP;
-};
-
-template <int Height, int Width, typename T> struct vnni_test {
-  vnni_test(T *dst, T *src, int surfaceH, int surfaceW, int surfaceP)
-      : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW),
-        surfaceP(surfaceP) {}
-
-  void operator()
-      [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::nd_item<1> item) const {
-    auto index = item.get_global_linear_id();
-#if defined(__SYCL_DEVICE_ONLY__)
-    int x_off = 0;
-    int y_off = index / SG_SZ * Height;
-
-    __ArrayMatrix<T, Height, Width, DataShuffle::vnni, SG_SZ> tmp0;
-    AddressPayload<Height, Width> address_payload_0(
-        (void *)src, surfaceH, surfaceW, surfaceP, x_off, y_off);
-    lscLoad<CacheCtrl::L1UC_L3UC>(tmp0, address_payload_0);
-
-    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> ret;
-    ret.getStorage() = tmp0.getStorage();
-
-    AddressPayload<Height, Width> address_payload_1(
-        (void *)dst, surfaceH, surfaceW, surfaceP, x_off, y_off);
-    lscStore<CacheCtrl::L1WB_L3WB>(address_payload_1, ret);
-#else
-    dst[index] += src[index];
-#endif
-  }
-
-private:
-  T *src;
-  T *dst;
+  T* src;
+  T* dst;
   int surfaceH;
   int surfaceW;
   int surfaceP;
@@ -119,14 +75,16 @@ private:
 int main(int argc, char *argv[]) {
   cxxopts::Options opts("Copy", "Copy baseline for performance");
   opts.allow_unrecognised_options();
-  opts.add_options()("s,size", "Size of test buffer",
-                     cxxopts::value<std::string>()->default_value("32MB"))(
-      "h,height", "Height of the surface",
-      cxxopts::value<int>()->default_value("1024"))(
-      "w,width", "Width of the surface",
-      cxxopts::value<int>()->default_value("64"))(
-      "p,pitch", "Pitch of the surface",
-      cxxopts::value<int>()->default_value("64"));
+  opts.add_options()
+    ("s,size", "Size of test buffer",
+     cxxopts::value<std::string>()->default_value("32MB"))
+    ("h,height", "Height of the surface",
+     cxxopts::value<int>()->default_value("1024"))
+    ("w,width", "Width of the surface",
+     cxxopts::value<int>()->default_value("64"))
+    ("p,pitch", "Pitch of the surface",
+     cxxopts::value<int>()->default_value("32"))
+    ;
 
   auto parsed_opts = opts.parse(argc, argv);
   auto sz_string = parsed_opts["size"].as<std::string>();
@@ -136,38 +94,32 @@ int main(int argc, char *argv[]) {
   auto surfaceW = parsed_opts["width"].as<int>();
   auto surfaceP = parsed_opts["pitch"].as<int>();
 
-  sycl::queue queue(
-      sycl::gpu_selector_v,
-      sycl::property_list{sycl::property::queue::enable_profiling(),
-                          sycl::property::queue::in_order()});
+  auto queue = currentQueue(0, 0);
 
-  auto *src = sycl::malloc_device(alloc_size, queue);
-  auto *dst = sycl::malloc_device(alloc_size, queue);
-  auto *b_host = sycl::malloc_host(alloc_size, queue);
-  auto *b_check = sycl::malloc_host(alloc_size, queue);
+  auto* src = sycl::malloc_device(alloc_size, queue);
+  auto* dst = sycl::malloc_device(alloc_size, queue);
+  auto* b_host = sycl::malloc_host(alloc_size, queue);
+  auto* b_check = sycl::malloc_host(alloc_size, queue);
 
-  release_guard __guard([&] {
+  release_guard __guard([&]{
     sycl::free(src, queue);
     sycl::free(dst, queue);
     sycl::free(b_host, queue);
     sycl::free(b_check, queue);
   });
-  typedef cl_half InT;
 
-  fill_sequential((InT *)b_host, 0., alloc_size / sizeof(InT));
+  fill_sequential((float *)b_host, 0., alloc_size / sizeof(float));
+
   queue.memcpy(src, b_host, alloc_size);
   queue.wait();
 
-  auto nelems = alloc_size / sizeof(InT);
-
-  queue.fill<InT>(dst, 1, nelems);
-
-  int tensorH = surfaceH;
-  constexpr int tensorW = 32; // bytes
-  constexpr int tensorP = tensorW;
   constexpr int ROW = 8;
-  constexpr int COL = tensorW / sizeof(InT);
-  auto block_sz = ROW * COL * sizeof(InT);
+
+  auto nelems = alloc_size / sizeof(float);
+
+  queue.fill<float>(dst, 1, nelems);
+
+  auto block_sz = ROW * SG_SZ * sizeof(uint32_t);
   auto blocks = (alloc_size + block_sz - 1) / block_sz;
 
   //  ------------SG_SZ * 4-byte--------------
@@ -176,30 +128,31 @@ int main(int argc, char *argv[]) {
   //  |                                      |
   //  ----------------------------------------
 
-  std::cout << "Num. of block: " << blocks << std::endl;
+  std::cout<<"Num. of block: "<<blocks<<std::endl;
   queue.submit([&](sycl::handler &h) {
-    h.parallel_for(sycl::nd_range<1>{blocks * SG_SZ, SG_SZ},
-                   tile_accumulate<ROW, COL, InT>(reinterpret_cast<InT *>(dst),
-                                            reinterpret_cast<InT *>(src),
-                                            tensorH, tensorW, tensorP));
+    h.parallel_for(sycl::range<1> { blocks * SG_SZ },
+        tile_accumulate<ROW, float>(
+          reinterpret_cast<float *>(dst),
+          reinterpret_cast<float *>(src),
+          surfaceH, surfaceW, surfaceP));
   });
 
   queue.memcpy(b_check, dst, alloc_size);
   queue.wait();
 
-  std::cout << "----------------------------------" << std::endl;
+  std::cout<<"----------------------------------"<<std::endl;
 
-  for (int k = 0; k < ROW; ++k) {
-    for (int i = 0; i < COL; ++i)
-      std::cout << ((InT *)b_check)[k * tensorP / sizeof(InT) + i] << ", ";
-    std::cout << std::endl;
+  for (int k = 0; k < 8; ++ k) {
+    for (int i = 0; i < 64/sizeof(float); ++ i)
+      std::cout<<((float *)b_check)[k*64/sizeof(float) + i]<<", ";
+    std::cout<<std::endl;
   }
 
-  std::cout << "----------------------------------" << std::endl;
+  std::cout<<"----------------------------------"<<std::endl;
 
-  for (int k = ROW; k < ROW * 2; ++k) {
-    for (int i = 0; i < COL; ++i)
-      std::cout << ((InT *)b_check)[k * tensorP / sizeof(InT) + i] << ", ";
-    std::cout << std::endl;
+  for (int k = 8; k < 16; ++ k) {
+    for (int i = 0; i < 64/sizeof(float); ++ i)
+      std::cout<<((float *)b_check)[k*64/sizeof(float) + i]<<", ";
+    std::cout<<std::endl;
   }
 }

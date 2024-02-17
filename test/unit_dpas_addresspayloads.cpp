@@ -4,11 +4,8 @@
 #include "cxxopts.hpp"
 #include "sycl_misc.hpp"
 #include "gen_visa_templates.hpp"
-#include <mkl.h>
-#include <cfloat>
-#include <cmath>
 
-#define SG_SZ 32
+#define SG_SZ 16
 
 size_t parse_nelems(const std::string& nelems_string) {
   size_t base = 1;
@@ -32,7 +29,7 @@ size_t parse_nelems(const std::string& nelems_string) {
 template <typename T>
 void fill_sequential(T *p, int rank, size_t nelems) {
   for (size_t i = 0; i < nelems; ++ i) {
-    p[i] = i % 3;
+    p[i] = i/1024. + rank;
   }
 }
 
@@ -47,65 +44,7 @@ void show_tile(T* start, int W, int H, size_t pitch) {
   }
 }
 
-
-template<typename T1,typename T2>
-bool all_close(
-    const T1 *actual, int lda, const T2 *desired, int ldb, const int M, const int N, const float rtol=1e-3, const float atol=1e-3) {
-  std::pair<int, int> maximum_idx;
-  float maximum_err = 0.f;
-  float tol = 0.f;
-  for (int m = 0; m < M; ++m) {
-    for (int n = 0; n < N; ++n) {
-      const float a = static_cast<float>(actual[m * lda + n]);
-      const float b = static_cast<float>(desired[m * ldb + n]);
-      if (std::isnan(a) || std::isnan(b) || std::isinf(a) || std::isinf(b)) 
-        return false;        
-      // std::cout << "actual = " << a << ", desired = " << b << std::endl;
-      const float err = std::fabs(a - b);
-      if (err > maximum_err) {
-        maximum_idx = {m, n};
-        maximum_err = err;
-        tol = atol + rtol * std::fabs(b);
-      }
-    }
-  }
-  if (maximum_err > tol) {
-    const int m = maximum_idx.first;
-    const int n = maximum_idx.second;
-    printf("Error! Matrix[%d, %d]=%.8f, ref=%.8f, error = %.8f, error term is > %E\n", m, n,
-        float(actual[m * lda + n]), float(desired[m * ldb + n]), maximum_err, tol);
-    fflush(stdout);
-    return false;
-  }
-  return true;
-}
-
 template <typename T>
-void verify_result(const T* actual_result, const T* srcA, const T* srcB, int M, int K, int N, int lda, int ldb, int ldc){
-  std::vector<float> a(M * K), b(K * N);
-  for(int i=0; i<M; ++i){
-    for(int j=0; j<K; ++j) {
-      a[i * K + j] = static_cast<float>(srcA[i * lda + j]);
-    }
-  }
-  for(int i=0; i<K; ++i){
-    for(int j=0; j<N; ++j) {
-      b[i * N + j] = static_cast<float>(srcB[i * ldb + j]);
-    }
-  }  
-  
-  std::vector<float> expected(M * N, 0);
-  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, a.data(), K, b.data(), N, 0, expected.data(), N);
-  
-  bool res = all_close(actual_result, ldc, expected.data(), N, M, N);
-  if (res) 
-    printf("test passed\n");
-  else
-    printf("test failed\n");  
-}
-
-
-template <typename T, int M, int K, int N>
 struct tile_accumulate {
   tile_accumulate(T* dst, sycl::half* src, int surfaceW, int surfaceH, int surfaceP)
     : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW), surfaceP(surfaceP)
@@ -118,23 +57,23 @@ struct tile_accumulate {
     auto x_off = grp_num * 16;
     auto y_off = 0;
 
-    AddressPayload<M, K> srcAddress(src,
+    AddressPayload<16, 8> srcAddress(src,
         surfaceW, surfaceH, surfaceP, x_off, y_off);
 
-    AddressPayload<M, N> dstAddress(srcAddress);
+    AddressPayload<16, 16> dstAddress(srcAddress);
     dstAddress.updateSurfaceBase(dst);
 
-    __Matrix<sycl::half, M, K, DataShuffle::none, 16> tmp0;
-    __Matrix<sycl::half, K, N, DataShuffle::vnni, 16> tmp1;
+    __Matrix<sycl::half, 16, 8> tmp0;
+    __Matrix<sycl::half, 16, 16, DataShuffle::vnni> tmp1;
 
     tmp0.load(srcAddress);
     tmp1.load(srcAddress);
 
-    __Matrix<float, M, N, DataShuffle::none, 16> acc;
-    acc.zero();
-    dpas(acc, acc, tmp0, tmp1);
-    
-    __Matrix<T, M, N, DataShuffle::none, 16> ret(acc);  
+    __Matrix<T, 16, 8> ret;
+    ret.zero();
+
+    dpas(ret, ret, tmp0, tmp1);
+
     ret.store(dstAddress);
 
 #else
@@ -179,13 +118,8 @@ int main(int argc, char *argv[]) {
 
   auto nelems = surfaceP * surround / sizeof(t_type);
   auto alloc_size = surfaceP * surround;
-  
-  sycl::queue queue = currentQueue(0, 0);
 
-  auto device = queue.get_device();
-  std::cout << "Device: " << device.get_info<sycl::info::device::name>()
-                << ", Platform: "
-                << device.get_platform().get_info<sycl::info::platform::name>() << std::endl;
+  auto queue = currentQueue(0, 0);
 
   auto* src = sycl::malloc_device(alloc_size, queue);
   auto* dst = sycl::malloc_device(alloc_size, queue);
@@ -206,15 +140,14 @@ int main(int argc, char *argv[]) {
   queue.memcpy(src, b_host, alloc_size);
   queue.wait();
 
-  constexpr int M = 8;
-  constexpr int K = 16;
-  constexpr int N = 16;
+  constexpr int Width = 16;
+  constexpr int Height = 8;
 
   queue.fill<t_type>(dst, 8., nelems);
 
   queue.submit([&](sycl::handler &h) {
     h.parallel_for(sycl::range<1> { groups * SG_SZ },
-        tile_accumulate<t_type, M, K, N>(
+        tile_accumulate<t_type>(
           reinterpret_cast<t_type *>(dst),
           reinterpret_cast<t_type *>(src),
           surfaceW, surfaceH, surfaceP));
@@ -223,9 +156,7 @@ int main(int argc, char *argv[]) {
   queue.memcpy(b_check, dst, alloc_size);
   queue.wait();
 
-
+  show_tile((t_type *)b_host, Width, Height, surfaceP);
   std::cout<<"------------------------------------------------"<<std::endl;
-  int ld = surfaceP / sizeof(t_type);
-  verify_result((t_type *)b_check, (t_type *)b_host, (t_type *)b_host, M, K, N, 
-    ld, ld, ld);
+  show_tile((t_type *)b_check, Width, Height, surfaceP);
 }
