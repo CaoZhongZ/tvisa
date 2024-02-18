@@ -108,6 +108,22 @@ struct AddressPayload {
   inline const uint32_t& getPayload() const {
     return payloadReg_;
   }
+  
+  inline AddressPayload& UpdateSrc0AddrX(int offset) {
+    asm volatile (
+        "mov (M1, 1) %0(0, 5)<1> %1(0, 0)<0;1,0> \n"
+        : "+rw"(payloadReg_) : "rw"(offset)
+    );
+    return *this;
+  }
+
+  inline AddressPayload& UpdateSrc0AddrY(int offset) {
+    asm volatile (
+        "mov (M1, 1) %0(0, 6)<1> %1(0, 0)<0;1,0> \n"
+        : "+rw"(payloadReg_) : "rw"(offset)
+    );
+    return *this;
+  }  
 
   inline AddressPayload& addSrc0AddrX(int offset) {
     asm volatile (
@@ -267,7 +283,7 @@ struct __Matrix {
 
   static_assert(sizeof(sycl::vec<T, N>)/sizeof(uint32_t) == NumRegs);
   using rawType = sycl::vec<uint32_t, sizeof(sycl::vec<T, N>)/sizeof(uint32_t)>;
-
+  using storage_type = typename sycl::vec<T, N>::vector_t;
   inline typename sycl::vec<T, N>::vector_t& getStorage() {
     return reinterpret_cast<typename sycl::vec<T, N>::vector_t&>(registerImage_);
   }
@@ -400,10 +416,10 @@ struct __ArrayMatrix {
 
   typedef __attribute__((ext_vector_type(N))) T storage_type;
   inline storage_type& getStorage() {
-    return reinterpret_cast<storage_type&>(registerImage_);
+    return registerImage_;
   }
   inline const storage_type& getStorage() const {
-    return reinterpret_cast<const storage_type&>(registerImage_);
+    return registerImage_;
   }
 
   __ArrayMatrix() = default;
