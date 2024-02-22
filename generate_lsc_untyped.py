@@ -28,7 +28,26 @@ class CacheCtrlNoStore(Enum):
     L1S_L3WB = 6
     L1WB_L3WB = 7
 
+class CacheCtrlNoPrefetch(Enum):
+    DEFAULT = 0
+    L1UC_L3C = 2
+    L1C_L3UC = 3
+    L1C_L3C = 4
+    L1S_L3UC = 5
+    L1S_L3C = 6
+    L1IAR_L3C = 7
+
 class CacheCtrlStrLoad(Enum):
+    DEFAULT = 'df.df'
+    L1UC_L3UC = 'uc.uc'
+    L1UC_L3C = 'uc.ca'
+    L1C_L3UC = 'ca.uc'
+    L1C_L3C = 'ca.ca'
+    L1S_L3UC = 'st.uc'
+    L1S_L3C = 'st.ca'
+    L1IAR_L3C = 'ra.ca'
+
+class CacheCtrlStrPrefetch(Enum):
     DEFAULT = 'df.df'
     L1UC_L3UC = 'uc.uc'
     L1UC_L3C = 'uc.ca'
@@ -82,6 +101,12 @@ def generate_rawsends(file_name, op):
         func_name = 'EnumerateStores'
         shuffles = StoreShuffle
         cachectrl = CacheCtrlNoStore
+    elif op == 2:
+        op = 3
+        des_lens = [0]
+        func_name = 'EnumeratePrefetch'
+        shuffles = DataShuffle
+        cachectrl = CacheCtrlNoPrefetch
 
     with open(file_name, 'w') as file:
         for shuf in shuffles:
@@ -104,8 +129,10 @@ def generate_lsc_untyped(filename, op):
     datamap = {1 :'d8c32', 2:'d16c32', 4:'d32', 8:'d64'}
     if op == 'EnumerateLSCLoad':
         cachectrl = CacheCtrlStrLoad
-    else:
+    elif op == 'EnumerateLSCStore':
         cachectrl = CacheCtrlStrStore
+    elif op == 'EnumerateLSCPrefetch':
+        cachectrl = CacheCtrlStrPrefetch
 
     with open(filename, 'w') as file:
         for data_size in [1,2,4,8]:
@@ -127,8 +154,10 @@ def generate_lsc_untyped(filename, op):
                         # print(func_str)
 
 if __name__ == "__main__":
+    generate_rawsends('./include/list_raw_prefetches.list', 2)
     generate_rawsends('./include/list_raw_loads.list', 3)
     generate_rawsends('./include/list_raw_stores.list', 7)
+    generate_lsc_untyped('./include/list_ugm_prefetches.list', 'EnumerateLSCPrefetch')
     generate_lsc_untyped('./include/list_ugm_loads.list', 'EnumerateLSCLoad')
     generate_lsc_untyped('./include/list_ugm_stores.list', 'EnumerateLSCStore')
 
