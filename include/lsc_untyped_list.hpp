@@ -86,13 +86,13 @@ template <> struct LscStore<DataWidth, VectorSize, SubGroupSize, CacheCtrl> { \
 
 template <int DataWidth, int DestRegNumber, DataShuffle Transpose, CacheCtrl Cache>
 struct RawPrefetch {
-  template <typename T, typename AddressPayload>
+  template <typename AddressPayload>
   static inline void run(const AddressPayload& adrs);
 };
 
 template <int DataWidth, int VectorSize, int SubGroupSize, CacheCtrl = CacheCtrl::DEFAULT>
 struct LscPrefetch {
-  template <typename T> static inline void run(T& var, const void* addr);
+  static inline void run(const void* addr);
 };
 
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
@@ -100,8 +100,8 @@ struct LscPrefetch {
 #define EnumeratePrefetch(DataWidth, DestRegNumber, DataShuffle, CacheCtrl, DescStr) \
   template <> \
   struct RawPrefetch<DataWidth, DestRegNumber, DataShuffle, CacheCtrl> {  \
-    template <typename T, typename AddressPayload> \
-    static inline void run(T& target, const AddressPayload& address) { \
+    template <typename AddressPayload> \
+    static inline void run(const AddressPayload& address) { \
       asm volatile ("\n"  \
           "raw_sends.15.1.0." str(DestRegNumber) " (M1, 1) 0x0:ud " str(DescStr) ":ud V0.0 V0.0 %0.0\n"  \
         : : "rw"(address.getPayload()));  \
@@ -114,9 +114,9 @@ struct LscPrefetch {
 #define EnumerateLSCPrefetch(DataWidth, VectorSize, SubGroupSize, CacheCtrl, \
     CacheStr, DtypeStr) \
 template <> struct LscPrefetch<DataWidth, VectorSize, SubGroupSize, CacheCtrl> { \
-  template <typename T> static inline void run(const void* addr) { \
+  static inline void run(const void* addr) { \
     asm volatile ("\n"  \
-        "lsc_load.ugm." str(CacheStr) " (M1, " str(SubGroupSize) ") V0:" str(DtypeStr) " flat[%1]:a64\n" \
+        "lsc_load.ugm." str(CacheStr) " (M1, " str(SubGroupSize) ") V0:" str(DtypeStr) " flat[%0]:a64\n" \
         : : "rw"(addr)); \
   } \
 };

@@ -61,6 +61,18 @@ static inline void lscStore(void* addr, const sycl::vec<T, N>& var) {
       addr, reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(var));
 }
 
+// Usage: lscPrefetch<message_t>(ptr + local_off);
+template <typename T, int N, int SubGroupSize, CacheCtrl CTL = CacheCtrl::DEFAULT>
+static inline void lscPrefetch(void *addr) {
+  LscPrefetch<sizeof(T), N, SubGroupSize, CTL>::run(addr);
+}
+
+// Usage: lscPrefetch(reinterpret_cast<message_t *>(ptr));
+template <int SubGroupSize, CacheCtrl CTL = CacheCtrl::DEFAULT, typename T, int N>
+static inline void lscPrefetch(sycl::vec<T, N> *addr) {
+  LscPrefetch<sizeof(T), N, SubGroupSize, CTL>::run(addr);
+}
+
 //
 // lscLoad<CacheCtrl::L1UC_L3UC>(M, address);
 //
