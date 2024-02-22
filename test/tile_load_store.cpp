@@ -43,38 +43,6 @@ template <typename T> void fill_sequential(T *p, int rank, size_t nelems) {
   }
 }
 
-template <int Height, int Width, typename T> struct tile_accumulate {
-  tile_accumulate(T *dst, T *src, int surfaceH, int surfaceW, int surfaceP)
-      : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW),
-        surfaceP(surfaceP) {}
-
-  void operator()
-      [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::nd_item<1> item) const {
-    auto index = item.get_global_linear_id();
-#if defined(__SYCL_DEVICE_ONLY__)
-    int x_off = 0;
-    int y_off = index / SG_SZ * Height;
-    
-    static constexpr int N = InnerLayout<T, Height, Width * sizeof(T),
-                                    DataShuffle::none, SG_SZ>::N;
-    std::array<T, N> tile;                                       
-    TileLoad<T, Height, Width, DataShuffle::none, SG_SZ> tile_load;
-    TileStore<T, Height, Width, DataShuffle::none, SG_SZ> tile_store;
-    
-    tile_load(src, surfaceH, surfaceW, surfaceP, x_off, y_off, tile);
-    tile_store(dst, surfaceH, surfaceW, surfaceP, x_off, y_off, tile);    
-#else
-    dst[index] += src[index];
-#endif
-  }
-
-private:
-  T *src;
-  T *dst;
-  int surfaceH;
-  int surfaceW;
-  int surfaceP;
-};
 
 template <int Height, int Width, typename T> struct vnni_test {
   vnni_test(T *dst, T *src, int surfaceH, int surfaceW, int surfaceP)
@@ -87,23 +55,17 @@ template <int Height, int Width, typename T> struct vnni_test {
 #if defined(__SYCL_DEVICE_ONLY__)
     int x_off = 0;
     int y_off = index / SG_SZ * Height;
+
+    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp0;
+    AddressPayload<Height, Width> address_payload_0(
+        (void *)src, surfaceH, surfaceW, surfaceP, x_off, y_off);
+    lscLoad<CacheCtrl::L1UC_L3UC>(tmp0, address_payload_0);
     
-    using tile_load_t = TileLoad<T, Height, Width, DataShuffle::none, SG_SZ>;
-    using load_elem_type = typename tile_load_t::storage_type;
-    constexpr int load_num_elem = tile_load_t::num_elem;
-    load_elem_type load_data[load_num_elem];
-    tile_load_t tile_load;
-    tile_load(src, surfaceH, surfaceW, surfaceP, x_off, y_off, load_data);
-    
-    using tile_store_t = TileStore<T, Height, Width, DataShuffle::none, SG_SZ>;
-    using store_elem_type =  typename tile_store_t::storage_type;
-    constexpr int store_num_elem = tile_store_t::num_elem;
-    store_elem_type store_data[store_num_elem];
-    
-    memcpy(store_data, load_data, sizeof(store_data));
-    
-    TileStore<T, Height, Width, DataShuffle::none, SG_SZ> tile_store;    
-    tile_store(dst, surfaceH, surfaceW, surfaceP, x_off, y_off, store_data);    
+    AddressPayload<16, Width> address_payload_1(
+        (void *)dst, surfaceH, surfaceW, surfaceP, x_off, y_off);    
+    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> ret;        
+    ret.getStorage() = tmp0.getStorage();
+    lscStore<CacheCtrl::L1WB_L3WB>(address_payload_1, ret);        
 #else
     dst[index] += src[index];
 #endif
@@ -180,7 +142,7 @@ int main(int argc, char *argv[]) {
 
   std::cout << "Num. of block: " << blocks << std::endl;
   queue.submit([&](sycl::handler &h) {
-    h.parallel_for(sycl::nd_range<1>{blocks * SG_SZ, SG_SZ},
+    h.parallel_for(sycl::nd_range<1>{SG_SZ, SG_SZ},
                    vnni_test<ROW, COL, InT>(reinterpret_cast<InT *>(dst),
                                             reinterpret_cast<InT *>(src),
                                             tensorH, tensorW, tensorP));

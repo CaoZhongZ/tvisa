@@ -1,5 +1,6 @@
 #pragma once
 
+#include "lsc.hpp"
 #define xstr(s) str(s)
 #define str(x) #x
 
@@ -12,6 +13,13 @@ struct RawSendLoad {
 
 template <int DataWidth, int DestRegNumber, DataShuffle Transpose, CacheCtrl Cache>
 struct RawSendStore {
+  template <typename T, typename AddressPayload>
+  static inline void run(const AddressPayload& adrs, const T& target);
+};
+
+
+template <int DataWidth, int DestRegNumber, DataShuffle Transpose, CacheCtrl Cache>
+struct RawSendStoreLarge {
   template <typename T, typename AddressPayload>
   static inline void run(const AddressPayload& adrs, const T& target);
 };
@@ -44,6 +52,27 @@ struct RawSendStore {
 
 #include "list_raw_stores.list"
 
+#define EnumerateLargeStores(DataWidth, DataShuffle, CacheCtrl, DescStr) \
+  template <>\
+  struct RawSendStoreLarge<DataWidth, 16, DataShuffle, CacheCtrl> {\
+    template <typename T, typename AddressPayload>\
+    static inline void run(const AddressPayload& address, const T& target){\
+        asm volatile ("\n"  \
+            "raw_sends.15.1.8.0 (M1, 1)  0x0:ud " str(DescStr) ":ud %0.0 %1.0 V0.0\n" \
+            "add (M1, 1) %0(0, 6)<1> %0(0, 6)<0;1,0> %2(0,0)<0;1,0>\n"\
+            "raw_sends.15.1.8.0 (M1, 1) 0x0:ud " str(DescStr) ":ud %0.0 %1.512 V0.0\n" \
+            :: "rw"(address.getPayload()), "rw"(target), "rw"(16));  \
+    }\
+  };
+
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::DEFAULT, 0x2800207);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1UC_L3UC, 0x2820207);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1UC_L3WB, 0x2840207);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1WT_L3UC, 0x2860207);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1WT_L3WB, 0x2880207);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1S_L3UC, 0x28a0207);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1S_L3WB, 0x28c0207);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1WB_L3WB, 0x28e0207);
 #endif
 
 template <int DataWidth, int VectorSize, int SubGroupSize, CacheCtrl = CacheCtrl::DEFAULT>

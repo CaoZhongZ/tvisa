@@ -426,6 +426,13 @@ struct __ArrayMatrix {
   __ArrayMatrix(const storage_type& rh): registerImage_(rh) {}
   __ArrayMatrix(storage_type&& rh): registerImage_(std::move(rh)) {}
   __ArrayMatrix(const __ArrayMatrix &rh) : registerImage_(rh.registerImage_) {}
+  
+  template<typename SrcT>
+  __ArrayMatrix(const __ArrayMatrix<SrcT, Height, Width, Transpose, SubGroupSize, ArraySize> &rh) {
+    #pragma  unroll
+    for(int i=0; i<N; ++i)
+      registerImage_[i] = static_cast<T>(rh.getStorage()[i]);
+  }  
 
   inline __ArrayMatrix& operator = (const __ArrayMatrix& rh) {
     registerImage_ = std::move(rh.registerImage_);    
