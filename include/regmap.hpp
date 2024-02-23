@@ -2,6 +2,7 @@
 
 #include "CL/cl_platform.h"
 #include <sycl/sycl.hpp>
+#include <type_traits>
 
 // TODO: move somewhere else
 template<int N> constexpr int Log2Ceiling() {
