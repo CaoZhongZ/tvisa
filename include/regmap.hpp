@@ -2,6 +2,7 @@
 
 #include "CL/cl_platform.h"
 #include <sycl/sycl.hpp>
+#include <type_traits>
 
 // TODO: move somewhere else
 template<int N> constexpr int Log2Ceiling() {
@@ -413,8 +414,8 @@ struct __ArrayMatrix {
     return reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(registerImage_);
   }
   */
-
-  typedef __attribute__((ext_vector_type(N))) T storage_type;
+  using storage_scalar_t = typename std::conditional_t<std::is_same_v<sycl::half, T>, _Float16, T>;
+  typedef __attribute__((ext_vector_type(N))) storage_scalar_t storage_type;
   inline storage_type& getStorage() {
     return registerImage_;
   }

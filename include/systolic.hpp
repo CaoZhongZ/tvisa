@@ -45,11 +45,11 @@ template <
 
 // cover half, PVC
 template <typename OT, typename AccumT>
-struct Dpas<OT, AccumT, cl_half, cl_half, systolic_config> {
+struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
   static constexpr int Depth = systolic_config::Depth;
   static constexpr int Width = systolic_config::Width;
 
-  static constexpr int OpsPerChan = 2; /* 2 */
+  static constexpr int OpsPerChan = sizeof(int) / sizeof(sycl::half); /* 2 */
   static constexpr int Src1ElemsPerChan = 1;
 
   static constexpr int K = Depth * OpsPerChan; /* 16 */
@@ -58,16 +58,16 @@ struct Dpas<OT, AccumT, cl_half, cl_half, systolic_config> {
   template <int M> static inline void run(
       __ArrayMatrix<OT, M, N, DataShuffle::none>&,
       __ArrayMatrix<AccumT, M, N, DataShuffle::none>&,
-      __ArrayMatrix<cl_half, M, K, DataShuffle::none>&,
-      __ArrayMatrix<cl_half, K, N, DataShuffle::vnni>&
+      __ArrayMatrix<sycl::half, M, K, DataShuffle::none>&,
+      __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>&
   );
 
 #define GenRepeat(M)  \
   template <> static inline void run<M>(  \
       __ArrayMatrix<OT, M, N, DataShuffle::none>& C,   /* dst */  \
       __ArrayMatrix<AccumT, M, N, DataShuffle::none>& Accum, /* src0 */ \
-      __ArrayMatrix<cl_half, M, K, DataShuffle::none>& A,  /* src2 */ \
-      __ArrayMatrix<cl_half, K, N, DataShuffle::vnni>& B   /* src1 */ \
+      __ArrayMatrix<sycl::half, M, K, DataShuffle::none>& A,  /* src2 */ \
+      __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */ \
   ) { \
     asm volatile ("{\n"  \
         ".decl aliasA v_type=G type=d num_elts=64 align=GRF alias=<%2,0>\n" \
@@ -84,8 +84,8 @@ struct Dpas<OT, AccumT, cl_half, cl_half, systolic_config> {
 //   template <> static inline void run<M>(  \
 //       __ArrayMatrix<OT, M, N, DataShuffle::none>& C,   /* dst */  \
 //       __ArrayMatrix<AccumT, M, N, DataShuffle::none>& Accum, /* src0 */ \
-//       __ArrayMatrix<cl_half, M, K, DataShuffle::none>& A,  /* src2 */ \
-//       __ArrayMatrix<cl_half, K, N, DataShuffle::vnni>& B   /* src1 */ \
+//       __ArrayMatrix<sycl::half, M, K, DataShuffle::none>& A,  /* src2 */ \
+//       __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */ \
 //   ) { \
 //     asm volatile ("{\n"  \
 //         "dpas.hf.hf.8." str(M) " (M1, 16) %0.0 %1.0 %3.0 %2(0, 0)\n"  \
@@ -105,27 +105,6 @@ struct Dpas<OT, AccumT, cl_half, cl_half, systolic_config> {
   GenRepeat(7);
   GenRepeat(8);
 #undef GenRepeat
-
-  // template <> 
-  // static inline void run<32>(
-  //     __ArrayMatrix<OT, 32, 16, DataShuffle::none>& C,   /* dst */  
-  //     __ArrayMatrix<AccumT, 32, 16, DataShuffle::none>& Accum, /* src0 */ 
-  //     __ArrayMatrix<cl_half, 32, 16, DataShuffle::none>& A,  /* src2 */ 
-  //     __ArrayMatrix<cl_half, 16, 16, DataShuffle::vnni>& B   /* src1 */ 
-  // ) {
-  //   asm volatile ("{\n"  
-  //       ".decl aliasA v_type=G type=d num_elts=256 align=GRF alias=<%2,0>\n" 
-  //       ".decl aliasB v_type=G type=d num_elts=128 align=GRF alias=<%3,0>\n"
-  //       "dpas.hf.hf.8.8 (M1, 16) %0.0 %1.0 aliasB.0 aliasA.0\n" 
-  //       "dpas.hf.hf.8.8 (M1, 16) %0.256 %1.256 aliasB.0 aliasA.256\n" 
-  //       "dpas.hf.hf.8.8 (M1, 16) %0.512 %1.512 aliasB.0 aliasA.512\n" 
-  //       "dpas.hf.hf.8.8 (M1, 16) %0.768 %1.768 aliasB.0 aliasA.768\n" 
-  //       "}\n" 
-  //       : "=rw"(C.getStorage()): "rw"(Accum.getStorage()),  \
-  //       "rw"(A.getStorage()), "rw"(B.getStorage())  \
-  //   );  \
-  // }
-
 };
 
 // using bf16 = sycl::ext::oneapi::bfloat16;
@@ -136,25 +115,25 @@ struct Dpas<OT, AccumT, cl_half, cl_half, systolic_config> {
 //   static constexpr int Depth = systolic_config::Depth;
 //   static constexpr int Width = systolic_config::Width;
 //
-//   static constexpr int OpsPerChan = sizeof(int) / sizeof(cl_half); /* 2 */
+//   static constexpr int OpsPerChan = sizeof(int) / sizeof(sycl::half); /* 2 */
 //   static constexpr int Src1ElemsPerChan = 1;
 //
 //   static constexpr int K = Depth * OpsPerChan; /* 16 */
 //   static constexpr int N = Width * Src1ElemsPerChan; /* 16 */
 //
 //   template <int M> static inline void run(
-//       __Matrix<OT, M, N, DataShuffle::none>&,
-//       __Matrix<AccumT, M, N, DataShuffle::none>&,
-//       __Matrix<bf16, M, K, DataShuffle::none>&,
-//       __Matrix<bf16, K, N, DataShuffle::vnni>&
+//       __ArrayMatrix<OT, M, N, DataShuffle::none>&,
+//       __ArrayMatrix<AccumT, M, N, DataShuffle::none>&,
+//       __ArrayMatrix<bf16, M, K, DataShuffle::none>&,
+//       __ArrayMatrix<bf16, K, N, DataShuffle::vnni>&
 //   );
 //
 // #define GenRepeat(M)  \
 //   template <> static inline void run<M>(  \
-//       __Matrix<OT, M, N, DataShuffle::none>& C,   /* dst */  \
-//       __Matrix<AccumT, M, N, DataShuffle::none>& Accum, /* src0 */ \
-//       __Matrix<bf16, M, K, DataShuffle::none>& A,  /* src2 */ \
-//       __Matrix<bf16, K, N, DataShuffle::vnni>& B   /* src1 */ \
+//       __ArrayMatrix<OT, M, N, DataShuffle::none>& C,   /* dst */  \
+//       __ArrayMatrix<AccumT, M, N, DataShuffle::none>& Accum, /* src0 */ \
+//       __ArrayMatrix<bf16, M, K, DataShuffle::none>& A,  /* src2 */ \
+//       __ArrayMatrix<bf16, K, N, DataShuffle::vnni>& B   /* src1 */ \
 //   ) { \
 //     asm volatile ("\n"  \
 //         "dpas.bf.bf.8." str(M) " (M1, 16) %0.0 %1.0 %3.0 %2(0, 0)\n"  \

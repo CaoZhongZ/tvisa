@@ -140,7 +140,7 @@ inline __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>&
 __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>::load(
     const AddressPayload<Height, Width, ArraySize>& address
 ) {
-  constexpr auto PhyNumRegs = __Matrix<T, Height, Width, Transpose, SubGroupSize>::PhyNumRegs;
+  constexpr auto PhyNumRegs = __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize>::PhyNumRegs;
   constexpr auto DataWidth = __ArrayMatrix::LSCWidth;
   RawSendLoad<DataWidth, PhyNumRegs, Transpose, CTL>::run(this->getStorage(), address);
   return *this;
