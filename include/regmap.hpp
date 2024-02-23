@@ -397,13 +397,13 @@ struct __ArrayMatrix {
     return reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(registerImage_);
   }
   */
-
-  typedef __attribute__((ext_vector_type(N))) T storage_type;
+  using storage_scalar_t = typename std::conditional_t<std::is_same_v<sycl::half, T>, _Float16, T>;
+  typedef __attribute__((ext_vector_type(N))) storage_scalar_t storage_type;
   inline storage_type& getStorage() {
-    return reinterpret_cast<storage_type&>(registerImage_);
+    return registerImage_;
   }
   inline const storage_type& getStorage() const {
-    return reinterpret_cast<const storage_type&>(registerImage_);
+    return registerImage_;
   }
 
   __ArrayMatrix() = default;
