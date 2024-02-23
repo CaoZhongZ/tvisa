@@ -8,7 +8,7 @@
 #include <cfloat>
 #include <cmath>
 
-#define SG_SZ 16
+#define SG_SZ 32
 
 size_t parse_nelems(const std::string& nelems_string) {
   size_t base = 1;
@@ -57,9 +57,10 @@ bool all_close(
   for (int m = 0; m < M; ++m) {
     for (int n = 0; n < N; ++n) {
       const float a = static_cast<float>(actual[m * lda + n]);
-      const float b = static_cast<float>(desired[m * ldb + n]);    
-      if (n < 3)
-        std::cout << "actual = " << a << ", desired = " << b << std::endl;
+      const float b = static_cast<float>(desired[m * ldb + n]);
+      if (std::isnan(a) || std::isnan(b) || std::isinf(a) || std::isinf(b)) 
+        return false;        
+      // std::cout << "actual = " << a << ", desired = " << b << std::endl;
       const float err = std::fabs(a - b);
       if (err > maximum_err) {
         maximum_idx = {m, n};
@@ -94,7 +95,15 @@ void verify_result(const T* actual_result, const T* srcA, const T* srcB, int M, 
   }  
   
   std::vector<float> expected(M * N, 0);
-  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, a.data(), K, b.data(), N, 0, expected.data(), N);
+  
+  for(int i=0; i<M; ++i){
+    for(int j=0; j<N; ++j){
+      for(int k=0; k<K; ++k){
+        expected[i * N + j] += a[i * K + k] * b[k * N + j];
+      }
+    }
+  }
+  // cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, a.data(), K, b.data(), N, 0, expected.data(), N);
   
   bool res = all_close(actual_result, ldc, expected.data(), N, M, N);
   if (res) 
@@ -106,7 +115,7 @@ void verify_result(const T* actual_result, const T* srcA, const T* srcB, int M, 
 
 template <typename T, int M, int K, int N>
 struct tile_accumulate {
-  tile_accumulate(T* dst, cl_half* src, int surfaceW, int surfaceH, int surfaceP)
+  tile_accumulate(T* dst, sycl::half* src, int surfaceW, int surfaceH, int surfaceP)
     : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW), surfaceP(surfaceP)
   {}
 
@@ -117,23 +126,24 @@ struct tile_accumulate {
     auto x_off = grp_num * 16;
     auto y_off = 0;
 
-    AddressPayload<M, K> srcAAddress(src,
+    AddressPayload<M, K> srcAddress(src,
         surfaceW, surfaceH, surfaceP, x_off, y_off);
-    AddressPayload<K, N> srcBAddress(src,
-        surfaceW, surfaceH, surfaceP, x_off, y_off);        
-    __ArrayMatrix<cl_half, M, K, DataShuffle::none, 16> tmp0;
-    __ArrayMatrix<cl_half, K, N, DataShuffle::vnni, 16> tmp1;
 
-    lscLoad(tmp0, srcAAddress);
-    lscLoad(tmp1, srcBAddress);
-
-    AddressPayload<M, N> dstAddress(srcAAddress);
+    AddressPayload<M, N> dstAddress(srcAddress);
     dstAddress.updateSurfaceBase(dst);
-    __ArrayMatrix<cl_half, M, N, DataShuffle::none, 16> acc;
+
+    __Matrix<sycl::half, M, K, DataShuffle::none, 16> tmp0;
+    __Matrix<sycl::half, K, N, DataShuffle::vnni, 16> tmp1;
+
+    tmp0.load(srcAddress);
+    tmp1.load(srcAddress);
+
+    __Matrix<float, M, N, DataShuffle::none, 16> acc;
     acc.zero();
-    dpas(acc, acc, tmp0, tmp1);    
+    dpas(acc, acc, tmp0, tmp1);
     
-    lscStore(dstAddress, acc);
+    __Matrix<T, M, N, DataShuffle::none, 16> ret(acc);  
+    ret.store(dstAddress);
 
 #else
     dst[index] += src[index];
@@ -141,7 +151,7 @@ struct tile_accumulate {
   }
 
 private:
-  cl_half* src;
+  sycl::half* src;
   T* dst;
   int surfaceH;
   int surfaceW;
@@ -173,7 +183,7 @@ int main(int argc, char *argv[]) {
 
   auto groups = parsed_opts["groups"].as<size_t>();
 
-  using t_type = cl_half;
+  using t_type = sycl::half;
 
   auto nelems = surfaceP * surround / sizeof(t_type);
   auto alloc_size = surfaceP * surround;
