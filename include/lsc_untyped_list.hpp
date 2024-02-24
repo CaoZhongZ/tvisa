@@ -59,9 +59,9 @@ struct RawSendStoreLarge {
     static inline void run(const AddressPayload& address, const T& target){\
         asm volatile ("\n"  \
             "raw_sends.15.1.8.0 (M1, 1)  0x0:ud " str(DescStr) ":ud %0.0 %1.0 V0.0\n" \
-            "add (M1, 1) %0(0, 6)<1> %0(0, 6)<0;1,0> %2(0,0)<0;1,0>\n"\
+            "add (M1, 1) %0(0, 6)<1> %0(0, 6)<0;1,0> %2\n"\
             "raw_sends.15.1.8.0 (M1, 1) 0x0:ud " str(DescStr) ":ud %0.0 %1.512 V0.0\n" \
-            :: "rw"(address.getPayload()), "rw"(target), "rw"(16));  \
+            :: "rw"(address.getPayload()), "rw"(target), "i"(16));  \
     }\
   };
 

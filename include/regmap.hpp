@@ -394,6 +394,17 @@ private:
 //
 // Test for normal array type instead of vector type
 //
+
+template <typename T> 
+struct StorageScalarType{
+    using type = T;
+};
+
+template <> 
+struct StorageScalarType<sycl::half>{
+    using type = _Float16;
+};
+
 template <typename T, int Height, int Width,
          DataShuffle Transpose = DataShuffle::none,
          int SubGroupSize = 16, int ArraySize = 1>
@@ -414,8 +425,7 @@ struct __ArrayMatrix {
     return reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(registerImage_);
   }
   */
-  using storage_scalar_t = typename std::conditional_t<std::is_same_v<sycl::half, T>, _Float16, T>;
-  typedef __attribute__((ext_vector_type(N))) storage_scalar_t storage_type;
+  using storage_type = __attribute__((ext_vector_type(N))) typename StorageScalarType<T>::type ;
   inline storage_type& getStorage() {
     return registerImage_;
   }
@@ -496,8 +506,20 @@ struct __ArrayMatrix {
   // XXX: performance problem for SIMD16/sycl::half when compiler generate
   // two instructions for single register operation.
   //
-  inline void zero() {
-    registerImage_ =0;
+  // inline typename std::enable_if<sizeof(storage_type) = 64 && SubGroupSize == 16, void>::type zero() {
+  //   asm volatile ("{\n"
+  //     ".decl alias v_type=G type=hf num_elts=512 align=GRF alias=<%0, 0>\n"
+  //     "mov (M1, 1) %0(0, 0)<1> %1\n"
+  //     "}\n"
+  //      : "=rw"(registerImage_) : "i"(0)
+  //   );
+  //   registerImage_ = 0;
+  // }
+  
+  
+  
+  inline void zero() {  
+      registerImage_ = 0;      
   }
 
 private:

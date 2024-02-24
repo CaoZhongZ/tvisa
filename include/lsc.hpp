@@ -27,6 +27,7 @@ enum BarrierType {
 #include "regmap.hpp"
 #include "lsc_untyped_list.hpp"
 
+#if defined(__SYCL_DEVICE_ONLY__)
 // API
 template <int subGroupSize, CacheCtrl CTL= CacheCtrl::DEFAULT, typename T>
 static inline void lscLoad(T& var, void *addr) {
@@ -89,7 +90,7 @@ static inline void lscLoad(
 
 template <CacheCtrl CTL= CacheCtrl::DEFAULT,
     typename T, int BlockHeight, int BlockWidth, DataShuffle Transpose, int SubGroupSize=16>
-static inline void lscStore(
+static inline typename std::enable_if<BlockHeight <= 16, void>::type lscStore(
     AddressPayload<BlockHeight, BlockWidth>& address,
     const __ArrayMatrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>& M
 ) {
@@ -104,15 +105,16 @@ static inline void lscStore(
 //  store more than 512 bytes, will decomposed to multiple 16x32 store, and only support update y_off
 template <CacheCtrl CTL= CacheCtrl::DEFAULT,
     typename T, int BlockHeight, int BlockWidth, DataShuffle Transpose, int SubGroupSize=16>
-static inline void lscStore(
-    AddressPayload<16, 16>& address,
+static inline typename std::enable_if<BlockHeight == 32 && BlockWidth == 16 && sizeof(T) == 2, void>::type lscStore(
+    AddressPayload<BlockHeight, BlockWidth>& address,
     const __ArrayMatrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>& M
 ) {
   static_assert(Transpose == DataShuffle::none, "Store support only none shuffled matrix");
-  static_assert(BlockHeight % 16 == 0 && BlockWidth == 16, "Only support store decomposed to multiple 16x32 bytes");
+  static_assert(BlockWidth == 16, "Only support store decomposed to multiple 16x32 bytes");
   constexpr auto PhyNumRegs = __ArrayMatrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>::PhyNumRegs;
   constexpr auto DataWidth = Log2<sizeof(T)>();
-  RawSendStoreLarge<DataWidth, PhyNumRegs, Transpose, CTL>::run(address, M.getStorage());
+  AddressPayload<16, 16> address_for_write(address); 
+  RawSendStoreLarge<DataWidth, PhyNumRegs, Transpose, CTL>::run(address_for_write, M.getStorage());
 }
 
 template <typename T, int Height, int Width,
@@ -172,3 +174,4 @@ __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>::store(
   RawSendStore<DataWidth, PhyNumRegs, Transpose, CTL>::run(address, this->getStorage());
   return *this;
 }
+#endif

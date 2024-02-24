@@ -1,14 +1,14 @@
-CC=clang
-CXX=clang++
+CC=icx
+CXX=icpx
 OPT_FLAGS=-g -O3 -ffast-math
 
 ENABLE_AOT=pvc
 
 SYCL_LIB=$(shell clang++ -print-file-name=libsycl.so)
-SYCL_ROOT=$(realpath $(dir $(SYCL_LIB)))
+SYCL_ROOT=/home3/zw/intel/oneapi/compiler/2024.0/
 
-SYCL_INCLUDE_DIR=$(SYCL_ROOT)/../include/sycl
-LLVM_INCLUDE_DIR=$(SYCL_ROOT)/../include
+SYCL_INCLUDE_DIR=$(SYCL_ROOT)/include/sycl
+LLVM_INCLUDE_DIR=$(SYCL_ROOT)/include
 
 # Remove the rule
 %.o : %.cpp
@@ -97,4 +97,4 @@ onepass : onepass.o
 	$(CXX) $(V) $(LINKFLAGS) -o $@ $<
 
 clean :
-	rm -f barrier_test copy_verify dump main accessor *.o *.header.hpp *.footer.hpp *.bc onepass ./tmp/*
+	rm -f barrier_test copy_verify dump main accessor *.o *.header.hpp *.footer.hpp *.bc onepass ./tmp/* ./dump/*

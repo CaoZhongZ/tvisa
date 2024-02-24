@@ -57,9 +57,7 @@ bool all_close(
   for (int m = 0; m < M; ++m) {
     for (int n = 0; n < N; ++n) {
       const float a = static_cast<float>(actual[m * lda + n]);
-      const float b = static_cast<float>(desired[m * ldb + n]);
-      if (std::isnan(a) || std::isnan(b) || std::isinf(a) || std::isinf(b)) 
-        return false;        
+      const float b = static_cast<float>(desired[m * ldb + n]);      
       // std::cout << "actual = " << a << ", desired = " << b << std::endl;
       const float err = std::fabs(a - b);
       if (err > maximum_err) {
@@ -96,14 +94,7 @@ void verify_result(const T* actual_result, const T* srcA, const T* srcB, int M, 
   
   std::vector<float> expected(M * N, 0);
   
-  for(int i=0; i<M; ++i){
-    for(int j=0; j<N; ++j){
-      for(int k=0; k<K; ++k){
-        expected[i * N + j] += a[i * K + k] * b[k * N + j];
-      }
-    }
-  }
-  // cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, a.data(), K, b.data(), N, 0, expected.data(), N);
+  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, a.data(), K, b.data(), N, 0, expected.data(), N);
   
   bool res = all_close(actual_result, ldc, expected.data(), N, M, N);
   if (res) 
@@ -115,7 +106,7 @@ void verify_result(const T* actual_result, const T* srcA, const T* srcB, int M, 
 
 template <typename T, int M, int K, int N>
 struct tile_accumulate {
-  tile_accumulate(T* dst, sycl::half* src, int surfaceW, int surfaceH, int surfaceP)
+  tile_accumulate(T* dst, T* src, int surfaceW, int surfaceH, int surfaceP)
     : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW), surfaceP(surfaceP)
   {}
 
@@ -126,24 +117,25 @@ struct tile_accumulate {
     auto x_off = grp_num * 16;
     auto y_off = 0;
 
-    AddressPayload<M, K> srcAddress(src,
+    AddressPayload<M, K> srcAAddress(src,
         surfaceW, surfaceH, surfaceP, x_off, y_off);
+    AddressPayload<K, N> srcBAddress(src,
+        surfaceW, surfaceH, surfaceP, x_off, y_off);        
 
-    AddressPayload<M, N> dstAddress(srcAddress);
+    AddressPayload<M, N> dstAddress(srcAAddress);
     dstAddress.updateSurfaceBase(dst);
 
-    __Matrix<sycl::half, M, K, DataShuffle::none, 16> tmp0;
-    __Matrix<sycl::half, K, N, DataShuffle::vnni, 16> tmp1;
+    __ArrayMatrix<T, M, K, DataShuffle::none, 16> tmp0;
+    __ArrayMatrix<T, K, N, DataShuffle::vnni, 16> tmp1;
 
-    tmp0.load(srcAddress);
-    tmp1.load(srcAddress);
+    lscLoad(tmp0, srcAAddress);
+    lscLoad(tmp1, srcBAddress);
 
-    __Matrix<float, M, N, DataShuffle::none, 16> acc;
+    __ArrayMatrix<T, M, N, DataShuffle::none, 16> acc;
     acc.zero();
     dpas(acc, acc, tmp0, tmp1);
     
-    __Matrix<T, M, N, DataShuffle::none, 16> ret(acc);  
-    ret.store(dstAddress);
+    lscStore(dstAddress, acc);
 
 #else
     dst[index] += src[index];
@@ -151,7 +143,7 @@ struct tile_accumulate {
   }
 
 private:
-  sycl::half* src;
+  T* src;
   T* dst;
   int surfaceH;
   int surfaceW;
@@ -214,7 +206,7 @@ int main(int argc, char *argv[]) {
   queue.memcpy(src, b_host, alloc_size);
   queue.wait();
 
-  constexpr int M = 8;
+  constexpr int M = 32;
   constexpr int K = 16;
   constexpr int N = 16;
 

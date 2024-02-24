@@ -1,14 +1,14 @@
-CC=clang
-CXX=clang++
+CC=icx
+CXX=icpx
 OPT_FLAGS=-g -O3 -ffast-math
 
 ENABLE_AOT=pvc
 
 SYCL_LIB=$(shell clang++ -print-file-name=libsycl.so)
-SYCL_ROOT=$(realpath $(dir $(SYCL_LIB)))
+SYCL_ROOT=/home3/zw/intel/oneapi/compiler/2024.0/
 
-SYCL_INCLUDE_DIR=$(SYCL_ROOT)/../include/sycl
-LLVM_INCLUDE_DIR=$(SYCL_ROOT)/../include
+SYCL_INCLUDE_DIR=$(SYCL_ROOT)/include/sycl
+LLVM_INCLUDE_DIR=$(SYCL_ROOT)/include
 
 # Remove the rule
 %.o : %.cpp
@@ -29,7 +29,7 @@ endif
 V=
 CXXFLAGS=-std=c++17 $(OPT_FLAGS) -Wall -Wno-deprecated-declarations -Wno-unused-variable -Wno-vla-cxx-extension -I../include -I..
 SYCLFLAGS=-fsycl -fsycl-id-queries-fit-in-int -fsycl-default-sub-group-size=16 -D__SYCL_INTERNAL_API -fsycl-targets=$(TARGET)
-LINKFLAGS=$(OPT_FLAGS) -fsycl -fsycl-max-parallel-link-jobs=8 -fsycl-targets=$(TARGET) $(LINKTARGET)
+LINKFLAGS=$(OPT_FLAGS) -fsycl -lblas -fsycl-max-parallel-link-jobs=8 -fsycl-targets=$(TARGET) $(LINKTARGET)
 
 .PRECIOUS : %-xe.o %.host.o %.dev.bc %.footer.hpp
 
@@ -91,8 +91,11 @@ good_2d_load_store : good_2d_load_store.o ../sycl_misc.o
 
 lsc_uncache_32_and_16 : lsc_uncache_32_and_16.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
+	
+unit_dpas_addresspayloads : unit_dpas_addresspayloads.o ../sycl_misc.o
+	$(CXX) $(V) $(LINKFLAGS) -o$@ $^	
 
 all : $(test_execs)
 
 clean :
-	rm -f $(test_execs) *.o *.header.hpp *.footer.hpp *.bc onepass ./tmp/*
+	rm -f $(test_execs) *.o *.header.hpp *.footer.hpp *.bc onepass ./tmp/* ./dump/*

@@ -105,6 +105,48 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
   GenRepeat(7);
   GenRepeat(8);
 #undef GenRepeat
+
+  template <> 
+  static inline void run<16>(  
+      __ArrayMatrix<OT, 16, N, DataShuffle::none>& C,   /* dst */  
+      __ArrayMatrix<AccumT, 16, N, DataShuffle::none>& Accum, /* src0 */ 
+      __ArrayMatrix<sycl::half, 16, K, DataShuffle::none>& A,  /* src2 */ 
+      __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */
+  ) { 
+    asm volatile ("{\n"
+        ".decl aliasA0 v_type=G type=d num_elts=128 align=GRF alias=<%2,0>\n"
+        ".decl aliasA1 v_type=G type=d num_elts=128 align=GRF alias=<%2,256>\n"
+        ".decl aliasB v_type=G type=d num_elts=128 align=GRF alias=<%3,0>\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.0 %1.0 aliasB.0 aliasA0(0,0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.256 %1.256 aliasB.0 aliasA1(0,0)\n"
+        "}\n" 
+        : "=rw"(C.getStorage()): "rw"(Accum.getStorage()),  \
+        "rw"(A.getStorage()), "rw"(B.getStorage())  \
+    );
+  }
+
+  template <> 
+  static inline void run<32>(  
+      __ArrayMatrix<OT, 32, N, DataShuffle::none>& C,   /* dst */  
+      __ArrayMatrix<AccumT, 32, N, DataShuffle::none>& Accum, /* src0 */ 
+      __ArrayMatrix<sycl::half, 32, K, DataShuffle::none>& A,  /* src2 */ 
+      __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */
+  ) { 
+    asm volatile ("{\n"
+        ".decl aliasA0 v_type=G type=d num_elts=256 align=GRF alias=<%2,0>\n"
+        ".decl aliasA1 v_type=G type=d num_elts=256 align=GRF alias=<%2,256>\n"
+        ".decl aliasA2 v_type=G type=d num_elts=256 align=GRF alias=<%2,512>\n"
+        ".decl aliasA3 v_type=G type=d num_elts=256 align=GRF alias=<%2,768>\n"
+        ".decl aliasB v_type=G type=d num_elts=128 align=GRF alias=<%3,0>\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.0 %1.0 aliasB.0 aliasA0(0, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.256 %1.256 aliasB.0 aliasA1(0, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.512 %1.512 aliasB.0 aliasA2(0, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.768 %1.768 aliasB.0 aliasA3(0, 0)\n"
+        "}\n" 
+        : "=rw"(C.getStorage()): "rw"(Accum.getStorage()),  \
+        "rw"(A.getStorage()), "rw"(B.getStorage())  \
+    );  
+  }
 };
 
 // using bf16 = sycl::ext::oneapi::bfloat16;
