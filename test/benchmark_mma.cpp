@@ -192,7 +192,7 @@ template <typename T> struct MMAKernelImpl {
           lscLoad<CacheCtrl::L1C_L3C>(mat_b[ik][in], b_block_address);
         }
       }
-      
+      asm("fence_sw");
       // mma
       for (int ik = 0; ik < segment_k; ++ik) {
         for (int im = 0; im < segment_m; ++im) {

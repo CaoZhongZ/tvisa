@@ -3,6 +3,7 @@
 #include "CL/cl_platform.h"
 #include <sycl/sycl.hpp>
 #include <type_traits>
+#include "set_zero.hpp"
 
 // TODO: move somewhere else
 template<int N> constexpr int Log2Ceiling() {
@@ -520,28 +521,16 @@ struct __ArrayMatrix {
   }
 
   //
-  // XXX: performance problem for SIMD16/sycl::half when compiler generate
-  // two instructions for single register operation.
+  // Note: due to performance problem for SIMD16/sycl::half when compiler generate
+  // two instructions for single register operation, we use inline asm here
   //
-  // inline typename std::enable_if<sizeof(storage_type) = 64 && SubGroupSize == 16, void>::type zero() {
-  //   asm volatile ("{\n"
-  //     ".decl alias v_type=G type=hf num_elts=512 align=GRF alias=<%0, 0>\n"
-  //     "mov (M1, 1) %0(0, 0)<1> %1\n"
-  //     "}\n"
-  //      : "=rw"(registerImage_) : "i"(0)
-  //   );
-  //   registerImage_ = 0;
-  // }
-  
-  
-  
-  inline void zero() {  
-      registerImage_ = 0;      
+  inline void zero(){
+    SetZero<storage_type, NumRegs>::run(registerImage_);
   }
-
 private:
   storage_type registerImage_;
 };
+
 
 // __RawMatrix for workaround IGC dpas type requirement if alias doesn't work
 template <typename T, int Height, int Width,

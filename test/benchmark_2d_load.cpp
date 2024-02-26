@@ -5,9 +5,9 @@
 #include <cmath>
 #include <sycl/sycl.hpp>
 
-constexpr const int sg_size = 32;
+constexpr const int sg_size = 16;
 constexpr const int sg_tile_m = 32;
-constexpr const int sg_tile_n = 32;
+constexpr const int sg_tile_n = 64;
 constexpr const int wg_tile_m = 128;
 constexpr const int wg_tile_n = 256;
 constexpr const int wg_size_m = wg_tile_m / sg_tile_m;
