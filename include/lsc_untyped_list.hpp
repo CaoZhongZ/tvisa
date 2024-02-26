@@ -116,7 +116,7 @@ template <> struct LscStore<DataWidth, VectorSize, SubGroupSize, CacheCtrl> { \
 template <int DataWidth, int DestRegNumber, DataShuffle Transpose, CacheCtrl Cache>
 struct RawPrefetch {
   template <typename AddressPayload>
-  static inline void run(const AddressPayload& adrs);
+  static inline void run(const AddressPayload& addr);
 };
 
 template <int DataWidth, int VectorSize, int SubGroupSize, CacheCtrl = CacheCtrl::DEFAULT>
@@ -132,7 +132,7 @@ struct LscPrefetch {
     template <typename AddressPayload> \
     static inline void run(const AddressPayload& address) { \
       asm volatile ("\n"  \
-          "raw_sends.15.1.0." str(DestRegNumber) " (M1, 1) 0x0:ud " str(DescStr) ":ud V0.0 V0.0 %0.0\n"  \
+          "raw_sends.15.1.0." str(DestRegNumber) " (M1, 1) 0x0:ud " str(DescStr) ":ud %0.0 V0.0 V0.0\n"  \
         : : "rw"(address.getPayload()));  \
     } \
   };

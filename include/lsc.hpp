@@ -90,6 +90,15 @@ static inline void lscLoad(
 
 template <CacheCtrl CTL= CacheCtrl::DEFAULT,
     typename T, int BlockHeight, int BlockWidth, DataShuffle Transpose, int SubGroupSize=16>
+static inline void lscPrefetch(
+    const AddressPayload<BlockHeight, BlockWidth>& address
+) {
+  constexpr auto DataWidth = __ArrayMatrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>::LSCWidth;
+  RawPrefetch<DataWidth, 0, Transpose, CTL>::run(address);
+}
+
+template <CacheCtrl CTL= CacheCtrl::DEFAULT,
+    typename T, int BlockHeight, int BlockWidth, DataShuffle Transpose, int SubGroupSize=16>
 static inline typename std::enable_if<BlockHeight <= 16, void>::type lscStore(
     AddressPayload<BlockHeight, BlockWidth>& address,
     const __ArrayMatrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>& M
