@@ -1,12 +1,12 @@
 #include "cxxopts.hpp"
 #include "event.hpp"
 #include "gen_visa_templates.hpp"
+#include "mma.hpp"
 #include "sycl_misc.hpp"
 #include <cmath>
 #include <mkl.h>
 #include <random>
 #include <sycl/sycl.hpp>
-#include "mma.hpp"
 
 constexpr const int sg_size = 16;
 constexpr const int sg_tile_m = 32;
@@ -140,7 +140,7 @@ template <typename T> struct MMAKernelImpl {
     int m_offset = wg_id_m * wg_tile_m + sg_id_m * sg_tile_m;
     int n_offset = wg_id_n * wg_tile_n + sg_id_n * sg_tile_n;
     int k_loop = matrix_k / k_stride;
-    
+
     constexpr const int mma_m = MMA32x32x16::mma_m_in_elem;
     constexpr const int mma_n = MMA32x32x16::mma_n_in_elem;
     constexpr const int mma_k = MMA32x32x16::mma_k_in_bytes / sizeof(T);
@@ -164,6 +164,43 @@ template <typename T> struct MMAKernelImpl {
         (void *)B, (uint32_t)matrix_k,
         static_cast<uint32_t>(matrix_n * sizeof(T)),
         static_cast<uint32_t>(matrix_n * sizeof(T)), n_offset, 0);
+
+    AddressPayload<mma_m, mma_k> prefetch_a_address(a_address);
+    AddressPayload<mma_k, mma_n> prefetch_b_address(b_address);
+    for (int i = 0; i < prefetch_stage; ++i) {
+      // prefetch a
+      for (int im = 0; im < segment_m; ++im) {
+        AddressPayload<mma_m, mma_k> prefetch_a_block_address(
+            prefetch_a_address);
+        prefetch_a_block_address.addSrc0AddrY(im * mma_m);
+
+        lscPrefetch<CacheCtrl::L1C_L3C, T, mma_m, mma_k, DataShuffle::none,
+                    sg_size>(prefetch_a_block_address);
+        for (int ik = 1; ik < segment_k; ++ik) {
+          prefetch_a_block_address.addSrc0AddrX(mma_k);
+          lscPrefetch<CacheCtrl::L1C_L3C, T, mma_m, mma_k, DataShuffle::none,
+                      sg_size>(prefetch_a_block_address);
+        }
+      }
+
+      // prefetch b
+      for (int ik = 0; ik < segment_k; ++ik) {
+        AddressPayload<mma_k, mma_n> prefetch_b_block_address(
+            prefetch_b_address);
+        prefetch_b_block_address.addSrc0AddrY(ik * mma_k);
+
+        lscPrefetch<CacheCtrl::L1C_L3C, T, mma_k, mma_n, DataShuffle::vnni,
+                sg_size>(prefetch_b_block_address);
+        for (int in = 1; in < segment_n; ++in) {
+          prefetch_b_block_address.addSrc0AddrX(mma_n);
+          lscPrefetch<CacheCtrl::L1C_L3C, T, mma_k, mma_n, DataShuffle::vnni,
+                  sg_size>(prefetch_b_block_address);
+        }
+      }
+      prefetch_a_address.addSrc0AddrX(k_stride);
+      prefetch_b_address.addSrc0AddrY(k_stride);
+    }
+
     for (int k = 0; k < k_loop; ++k) {
       // load A
       __ArrayMatrix<T, mma_m, mma_k, DataShuffle::none, sg_size>
@@ -192,6 +229,39 @@ template <typename T> struct MMAKernelImpl {
           lscLoad<CacheCtrl::L1C_L3C>(mat_b[ik][in], b_block_address);
         }
       }
+
+      if constexpr (prefetch_stage != 0) {
+        // prefetch a
+        for (int im = 0; im < segment_m; ++im) {
+          AddressPayload<mma_m, mma_k> prefetch_a_block_address(
+              prefetch_a_address);
+          prefetch_a_block_address.addSrc0AddrY(im * mma_m);
+
+          lscPrefetch<CacheCtrl::L1C_L3C, T, mma_m, mma_k, DataShuffle::none,
+                      sg_size>(prefetch_a_block_address);
+          for (int ik = 1; ik < segment_k; ++ik) {
+            prefetch_a_block_address.addSrc0AddrX(mma_k);
+            lscPrefetch<CacheCtrl::L1C_L3C, T, mma_m, mma_k, DataShuffle::none,
+                        sg_size>(prefetch_a_block_address);
+          }
+        }
+
+        // prefetch b
+        for (int ik = 0; ik < segment_k; ++ik) {
+          AddressPayload<mma_k, mma_n> prefetch_b_block_address(
+              prefetch_b_address);
+          prefetch_b_block_address.addSrc0AddrY(ik * mma_k);
+
+          lscPrefetch<CacheCtrl::L1C_L3C, T, mma_k, mma_n, DataShuffle::vnni,
+                  sg_size>(prefetch_b_block_address);
+          for (int in = 1; in < segment_n; ++in) {
+            prefetch_b_block_address.addSrc0AddrX(mma_n);
+            lscPrefetch<CacheCtrl::L1C_L3C, T, mma_k, mma_n, DataShuffle::vnni,
+                    sg_size>(prefetch_b_block_address);
+          }
+        }
+      }
+
       asm("fence_sw");
       // mma
       for (int ik = 0; ik < segment_k; ++ik) {
@@ -204,7 +274,9 @@ template <typename T> struct MMAKernelImpl {
       // dpas<mma_m, mma_k, mma_n>(acc, acc, mat_a, mat_b);
       a_address.addSrc0AddrX(k_stride);
       b_address.addSrc0AddrY(k_stride);
-    }    
+      prefetch_a_address.addSrc0AddrX(k_stride);
+      prefetch_b_address.addSrc0AddrY(k_stride);
+    }
 
     // store c
     AddressPayload<mma_m, mma_n> c_address(
@@ -274,14 +346,15 @@ int main(int argc, char *argv[]) {
   using data_type_b = InT;
   using data_type_c = InT;
 
-  sycl::queue queue = getQueue<0,0>();
+  sycl::queue queue = getQueue<0, 0>();
 
   auto context = queue.get_info<sycl::info::queue::context>();
   auto device = queue.get_info<sycl::info::queue::device>();
-  
+
   std::cout << "Device: " << device.get_info<sycl::info::device::name>()
-                << ", Platform: "
-                << device.get_platform().get_info<sycl::info::platform::name>() << std::endl;  
+            << ", Platform: "
+            << device.get_platform().get_info<sycl::info::platform::name>()
+            << std::endl;
 
   auto A = alloc_shared_and_init<data_type_a>(
       size_a,
