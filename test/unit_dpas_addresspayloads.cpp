@@ -8,7 +8,7 @@
 #include <cfloat>
 #include <cmath>
 
-#define SG_SZ 32
+#define SG_SZ 16
 
 size_t parse_nelems(const std::string& nelems_string) {
   size_t base = 1;
@@ -104,8 +104,11 @@ void verify_result(const T* actual_result, const T* srcA, const T* srcB, int M, 
 }
 
 
+template <typename T, int M, int K, int N, typename Enable = void>
+struct tile_accumulate;
+
 template <typename T, int M, int K, int N>
-struct tile_accumulate {
+struct tile_accumulate<T, M, K, N, typename std::enable_if_t<K == 16 && N == 16, void>> {
   tile_accumulate(T* dst, T* src, int surfaceW, int surfaceH, int surfaceP)
     : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW), surfaceP(surfaceP)
   {}
@@ -136,7 +139,66 @@ struct tile_accumulate {
     dpas(acc, acc, tmp0, tmp1);
     
     lscStore(dstAddress, acc);
+#else
+    dst[index] += src[index];
+#endif
+  }
 
+private:
+  T* src;
+  T* dst;
+  int surfaceH;
+  int surfaceW;
+  int surfaceP;
+};
+
+
+template <typename T, int M, int K, int N>
+struct tile_accumulate<T, M, K, N, typename std::enable_if_t<K == 16 && (N > 16) && (N % 16 == 0), void>> {
+  tile_accumulate(T* dst, T* src, int surfaceW, int surfaceH, int surfaceP)
+    : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW), surfaceP(surfaceP)
+  {}
+
+  void operator() [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::id<1> index) const {
+#if defined(__SYCL_DEVICE_ONLY__)
+    auto grp_num = index / SG_SZ;
+
+    auto x_off = grp_num * 16;
+    auto y_off = 0;
+
+    // load a
+    AddressPayload<M, 16> srcAAddress(src,
+        surfaceW, surfaceH, surfaceP, x_off, y_off);
+    __ArrayMatrix<T, M, 16, DataShuffle::none, 16> tmp0;
+    lscLoad(tmp0, srcAAddress);
+    
+    // load b
+    AddressPayload<16, 16> srcBAddress(src,
+        surfaceW, surfaceH, surfaceP, x_off, y_off);        
+    __ArrayMatrix<T, 16, 16, DataShuffle::vnni, 16> tmp1[N/16];
+    constexpr int N_Loop = N / 16;
+    #pragma unroll
+    for(int i=0; i<N_Loop; ++i) {
+      srcBAddress.UpdateSrc0AddrX(y_off + i * 16);
+      lscLoad(tmp1[i], srcBAddress);
+    }
+    
+    // MMA
+    __ArrayMatrix<T, M, 16, DataShuffle::none, 16> acc[N/16];    
+    #pragma unroll
+    for(int i=0; i<N_Loop; ++i) {
+      acc[i].zero();
+      dpas(acc[i], acc[i], tmp0, tmp1[i]);            
+    }
+    
+    // store c
+    AddressPayload<M, 16> dstAddress(srcAAddress);
+    dstAddress.updateSurfaceBase(dst);
+    #pragma unroll
+    for(int i=0; i<N_Loop; ++i) {
+      dstAddress.UpdateSrc0AddrX(y_off + i * 16);             
+      lscStore(dstAddress, acc[i]);  
+    }
 #else
     dst[index] += src[index];
 #endif
@@ -208,7 +270,7 @@ int main(int argc, char *argv[]) {
 
   constexpr int M = 32;
   constexpr int K = 16;
-  constexpr int N = 16;
+  constexpr int N = 64;
 
   queue.fill<t_type>(dst, 8., nelems);
 

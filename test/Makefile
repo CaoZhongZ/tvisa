@@ -94,6 +94,12 @@ lsc_uncache_32_and_16 : lsc_uncache_32_and_16.o ../sycl_misc.o
 	
 unit_dpas_addresspayloads : unit_dpas_addresspayloads.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^	
+	
+benchmark_2d_load: benchmark_2d_load.o 	../sycl_misc.o
+	$(CXX) $(V) $(LINKFLAGS) -o$@ $^	
+
+benchmark_mma: benchmark_mma.o ../sycl_misc.o
+	$(CXX) $(V) $(LINKFLAGS) -o$@ $^	
 
 all : $(test_execs)
 

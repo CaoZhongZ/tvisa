@@ -323,6 +323,23 @@ struct __Matrix {
     registerImage_ = std::move(rh.registerImage_);
     return *this;
   }
+  
+  template<typename SrcT>  
+  inline __Matrix& operator = (__Matrix<SrcT, Height, Width, Transpose, SubGroupSize, ArraySize> && rh) {
+    #pragma  unroll
+    for(int i=0; i<N; ++i)
+      registerImage_[i] = std::move(static_cast<T>((rh.getImage())[i]));
+    return *this;
+  }  
+  // TODO: fix accuracy error there
+  template<typename SrcT>  
+  inline __Matrix& operator = (const __Matrix<SrcT, Height, Width, Transpose, SubGroupSize, ArraySize> & rh) {
+    #pragma  unroll
+    for(int i=0; i<N; ++i)
+      registerImage_[i] = static_cast<T>((rh.getImage())[i]);
+    return *this;
+  }    
+  
   inline __Matrix& operator = (const __Matrix& rh) {
     registerImage_ = rh.registerImage_;
     return *this;
