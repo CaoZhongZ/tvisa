@@ -16,18 +16,19 @@ constexpr const int wg_tile_n = 256;
 constexpr const int wg_size_m = wg_tile_m / sg_tile_m;
 constexpr const int wg_size_n = wg_tile_n / sg_tile_n;
 constexpr const int k_stride = 16;
+constexpr const int k_unroll = 8;
 
-constexpr const int prefetch_stage = 3;
+constexpr const int prefetch_stage = 0;
 
 template <typename result_type>
-inline result_type generate_random(result_type a = -1.0, result_type b = 1.0) {
-  // unsigned seed =
-  // std::chrono::system_clock::now().time_since_epoch().count();
-  // std::default_random_engine engine(seed);
-  // std::uniform_real_distribution<result_type> distribution(a, b);
+inline result_type generate_random(result_type a = -0.5, result_type b = 0.5) {
+  unsigned seed =
+  std::chrono::system_clock::now().time_since_epoch().count();
+  std::default_random_engine engine(seed);
+  std::uniform_real_distribution<result_type> distribution(a, b);
 
-  // return distribution(engine);
-  return 1;
+  return distribution(engine);
+  // return 1;
 }
 
 #define random_float() (generate_random<double>())
@@ -168,6 +169,11 @@ template <typename T> struct MMAKernelImpl {
     AddressPayload<mma_m, mma_k> prefetch_a_address(a_address);
     AddressPayload<mma_k, mma_n> prefetch_b_address(b_address);
     for (int i = 0; i < prefetch_stage; ++i) {
+
+      int pre_k_start = (sg_id_m + sg_id_n + i) % k_unroll;
+      prefetch_a_address.updateSrc0AddrX(k_stride * pre_k_start);
+      prefetch_b_address.updateSrc0AddrY(k_stride * pre_k_start);               
+      
       // prefetch a
       for (int im = 0; im < segment_m; ++im) {
         AddressPayload<mma_m, mma_k> prefetch_a_block_address(
@@ -201,7 +207,19 @@ template <typename T> struct MMAKernelImpl {
       prefetch_b_address.addSrc0AddrY(k_stride);
     }
 
-    for (int k = 0; k < k_loop; ++k) {
+    for (int k = 0; k < k_loop; k+= k_unroll) {
+      #pragma nounroll
+      for(int kk=0; kk<k_unroll; ++kk) {
+      int k_start = (sg_id_m + sg_id_n + k + kk) % k_unroll;
+      a_address.updateSrc0AddrX(k_stride * (k + k_start));
+      b_address.updateSrc0AddrY(k_stride * (k + k_start));      
+      
+      if constexpr (prefetch_stage != 0){
+      int pre_k_start = (sg_id_m + sg_id_n + k + kk + prefetch_stage) % k_unroll;      
+      prefetch_a_address.updateSrc0AddrX(k_stride * pre_k_start);
+      prefetch_b_address.updateSrc0AddrY(k_stride * pre_k_start);        
+      }
+      
       // load A
       __ArrayMatrix<T, mma_m, mma_k, DataShuffle::none, sg_size>
           mat_a[segment_m][segment_k];
@@ -260,7 +278,7 @@ template <typename T> struct MMAKernelImpl {
                     sg_size>(prefetch_b_block_address);
           }
         }
-      }
+      }      
 
       asm("fence_sw");
       // mma
@@ -272,11 +290,13 @@ template <typename T> struct MMAKernelImpl {
         }
       }
       // dpas<mma_m, mma_k, mma_n>(acc, acc, mat_a, mat_b);
-      a_address.addSrc0AddrX(k_stride);
-      b_address.addSrc0AddrY(k_stride);
-      prefetch_a_address.addSrc0AddrX(k_stride);
-      prefetch_b_address.addSrc0AddrY(k_stride);
-    }
+      // a_address.addSrc0AddrX(k_stride);
+      // b_address.addSrc0AddrY(k_stride);      
+
+      // prefetch_a_address.addSrc0AddrX(k_stride);
+      // prefetch_b_address.addSrc0AddrY(k_stride);
+    }   
+  }
 
     // store c
     AddressPayload<mma_m, mma_n> c_address(
@@ -384,7 +404,7 @@ int main(int argc, char *argv[]) {
   // warm up
   compute_kernel(queue, A, B, C, matrix_m, matrix_k, matrix_n);
 
-  constexpr const int iter = 10;
+  constexpr const int iter = 20;
   float durations(0);
   for (int i = 0; i < iter; ++i) {
     auto evt = compute_kernel(queue, A, B, C, matrix_m, matrix_k, matrix_n);
