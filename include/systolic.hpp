@@ -131,6 +131,81 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
   GenRepeat(7);
   GenRepeat(8);
 #undef GenRepeat
+
+  template <> 
+  static inline void run<16>(  
+      __ArrayMatrix<OT, 16, N, DataShuffle::none>& C,   /* dst */  
+      __ArrayMatrix<AccumT, 16, N, DataShuffle::none>& Accum, /* src0 */ 
+      __ArrayMatrix<sycl::half, 16, K, DataShuffle::none>& A,  /* src2 */ 
+      __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */
+  ) { 
+    asm volatile ("{\n"
+        ".decl aliasA v_type=G type=d num_elts=128 align=GRF alias=<%2,0>\n"
+        ".decl aliasB v_type=G type=d num_elts=128 align=GRF alias=<%3,0>\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.0 %1.0 aliasB.0 aliasA(0, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.256 %1.256 aliasB.0 aliasA(4, 0)\n"
+        "}\n" 
+        : "=rw"(C.getStorage()): "rw"(Accum.getStorage()),  \
+        "rw"(A.getStorage()), "rw"(B.getStorage())  \
+    );
+  }
+  
+  // TODO: fix error here
+  template <> 
+  static inline void run<16>(  
+      __ArrayMatrix<sycl::half, 16, N, DataShuffle::none>& C,   /* dst */  
+      __ArrayMatrix<sycl::half, 16, K, DataShuffle::none>& A,  /* src2 */ 
+      __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */
+  ) { 
+    asm volatile ("{\n"
+        ".decl aliasA v_type=G type=d num_elts=128 align=GRF alias=<%1,0>\n"
+        ".decl aliasB v_type=G type=d num_elts=128 align=GRF alias=<%2,0>\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.0 %0.0 aliasB.0 aliasA(0, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.256 %0.256 aliasB.0 aliasA(4, 0)\n"
+        "}\n" 
+        : "=rw"(C.getStorage()): "rw"(A.getStorage()), "rw"(B.getStorage())  \
+    );
+  }  
+
+  template <> 
+  static inline void run<32>(  
+      __ArrayMatrix<OT, 32, N, DataShuffle::none>& C,   /* dst */  
+      __ArrayMatrix<AccumT, 32, N, DataShuffle::none>& Accum, /* src0 */ 
+      __ArrayMatrix<sycl::half, 32, K, DataShuffle::none>& A,  /* src2 */ 
+      __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */
+  ) { 
+    asm volatile ("{\n"
+        ".decl aliasA v_type=G type=d num_elts=256 align=GRF alias=<%2,0>\n"
+        ".decl aliasB v_type=G type=d num_elts=128 align=GRF alias=<%3,0>\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.0 %1.0 aliasB.0 aliasA(0, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.256 %1.256 aliasB.0 aliasA(4, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.512 %1.512 aliasB.0 aliasA(8, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.768 %1.768 aliasB.0 aliasA(12, 0)\n"
+        "}\n" 
+        : "=rw"(C.getStorage()): "rw"(Accum.getStorage()),  \
+        "rw"(A.getStorage()), "rw"(B.getStorage())  \
+    );  
+  }
+  
+  // TODO: fix error here  
+  template <> 
+  static inline void run<32>(  
+      __ArrayMatrix<OT, 32, N, DataShuffle::none>& C,   /* dst */  
+      __ArrayMatrix<sycl::half, 32, K, DataShuffle::none>& A,  /* src2 */ 
+      __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */
+  ) { 
+    asm volatile ("{\n"
+        ".decl aliasA v_type=G type=d num_elts=256 align=GRF alias=<%1,0>\n"
+        ".decl aliasB v_type=G type=d num_elts=128 align=GRF alias=<%2,0>\n"
+        ".decl aliasAcc v_type=G type=hf num_elts=512 align=GRF alias=<%0,0>\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.0 aliasAcc.0 aliasB.0 aliasA(0, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.256 aliasAcc.256 aliasB.0 aliasA(4, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.512 aliasAcc.512 aliasB.0 aliasA(8, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.768 aliasAcc.768 aliasB.0 aliasA(12, 0)\n"
+        "}\n" 
+        : "=rw"(C.getStorage()): "rw"(A.getStorage()), "rw"(B.getStorage())  \
+    );  
+  }  
 };
 
 // using bf16 = sycl::ext::oneapi::bfloat16;
@@ -197,6 +272,22 @@ static inline void dpas(
   // TODO: check accepted parameters with static assert;
   static_assert(SubGroupSize == 16, "SubGroupSize for dpas must be 16");
   Dpas<OT, AccumT, IT1, IT2, systolic_config>::template run<M>(D, C, A, B);
+}
+
+template <
+  int M, int K, int N,
+  typename OT,
+  typename IT1,
+  typename IT2,
+  int SubGroupSize,
+  typename config = systolic_config>
+static inline void dpas(
+    __ArrayMatrix<OT, M, N, DataShuffle::none, SubGroupSize>& C,
+    __ArrayMatrix<IT1, M, K,  DataShuffle::none, SubGroupSize>& A, __ArrayMatrix<IT2, K, N, DataShuffle::vnni, SubGroupSize>& B
+) {
+  // TODO: check accepted parameters with static assert;
+  static_assert(SubGroupSize == 16, "SubGroupSize for dpas must be 16");
+  Dpas<OT, OT, IT1, IT2, systolic_config>::template run<M>(C, A, B);
 }
 
 }

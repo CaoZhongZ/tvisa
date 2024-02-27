@@ -64,8 +64,7 @@ template <int Height, int Width, typename T> struct tile_accumulate {
     lscLoad(tmp0, address_payload_0);
     lscLoad(tmp1, address_payload_1);
 
-    __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> ret = tmp0 + tmp1;
-
+    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> ret = tmp0 + tmp1;
     lscStore<CacheCtrl::L1WB_L3WB>(address_payload_1, ret);
 #else
     dst[index] += src[index];
@@ -175,7 +174,7 @@ int main(int argc, char *argv[]) {
   int tensorH = surfaceH;
   constexpr int tensorW = 32; // bytes
   constexpr int tensorP = tensorW;
-  constexpr int ROW = 8;
+  constexpr int ROW = 32;
   constexpr int COL = tensorW / sizeof(InT);
   auto block_sz = ROW * COL * sizeof(InT);
   auto blocks = (alloc_size + block_sz - 1) / block_sz;
