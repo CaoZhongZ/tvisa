@@ -163,7 +163,7 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
         "dpas.hf.hf.8.8 (M1, 16) %0.0 %0.0 aliasB.0 aliasA(0, 0)\n"
         "dpas.hf.hf.8.8 (M1, 16) %0.256 %0.256 aliasB.0 aliasA(4, 0)\n"
         "}\n" 
-        : "=rw"(C.getStorage()): "rw"(A.getStorage()), "rw"(B.getStorage())  \
+        : "+rw"(C.getStorage()): "rw"(A.getStorage()), "rw"(B.getStorage())  \
     );
   }  
 
@@ -197,13 +197,12 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
     asm volatile ("{\n"
         ".decl aliasA v_type=G type=d num_elts=256 align=GRF alias=<%1,0>\n"
         ".decl aliasB v_type=G type=d num_elts=128 align=GRF alias=<%2,0>\n"
-        ".decl aliasAcc v_type=G type=hf num_elts=512 align=GRF alias=<%0,0>\n"
-        "dpas.hf.hf.8.8 (M1, 16) %0.0 aliasAcc.0 aliasB.0 aliasA(0, 0)\n"
-        "dpas.hf.hf.8.8 (M1, 16) %0.256 aliasAcc.256 aliasB.0 aliasA(4, 0)\n"
-        "dpas.hf.hf.8.8 (M1, 16) %0.512 aliasAcc.512 aliasB.0 aliasA(8, 0)\n"
-        "dpas.hf.hf.8.8 (M1, 16) %0.768 aliasAcc.768 aliasB.0 aliasA(12, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.0 %0.0 aliasB.0 aliasA(0, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.256 %0.256 aliasB.0 aliasA(4, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.512 %0.512 aliasB.0 aliasA(8, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) %0.768 %0.768 aliasB.0 aliasA(12, 0)\n"
         "}\n" 
-        : "=rw"(C.getStorage()): "rw"(A.getStorage()), "rw"(B.getStorage())  \
+        : "+rw"(C.getStorage()): "rw"(A.getStorage()), "rw"(B.getStorage())  \
     );  
   }  
 };
@@ -283,7 +282,8 @@ template <
   typename config = systolic_config>
 static inline void dpas(
     __ArrayMatrix<OT, M, N, DataShuffle::none, SubGroupSize>& C,
-    __ArrayMatrix<IT1, M, K,  DataShuffle::none, SubGroupSize>& A, __ArrayMatrix<IT2, K, N, DataShuffle::vnni, SubGroupSize>& B
+    __ArrayMatrix<IT1, M, K,  DataShuffle::none, SubGroupSize>& A,
+    __ArrayMatrix<IT2, K, N, DataShuffle::vnni, SubGroupSize>& B
 ) {
   // TODO: check accepted parameters with static assert;
   static_assert(SubGroupSize == 16, "SubGroupSize for dpas must be 16");
