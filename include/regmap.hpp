@@ -2,6 +2,8 @@
 
 #include "CL/cl_platform.h"
 #include <sycl/sycl.hpp>
+#include <type_traits>
+#include "set_zero.hpp"
 
 // TODO: move somewhere else
 template<int N> constexpr int Log2Ceiling() {
@@ -108,6 +110,22 @@ struct AddressPayload {
   inline const uint32_t& getPayload() const {
     return payloadReg_;
   }
+  
+  inline AddressPayload& UpdateSrc0AddrX(int offset) {
+    asm volatile (
+        "mov (M1, 1) %0(0, 5)<1> %1(0, 0)<0;1,0> \n"
+        : "+rw"(payloadReg_) : "rw"(offset)
+    );
+    return *this;
+  }
+
+  inline AddressPayload& UpdateSrc0AddrY(int offset) {
+    asm volatile (
+        "mov (M1, 1) %0(0, 6)<1> %1(0, 0)<0;1,0> \n"
+        : "+rw"(payloadReg_) : "rw"(offset)
+    );
+    return *this;
+  }  
 
   inline AddressPayload& addSrc0AddrX(int offset) {
     asm volatile (
@@ -377,6 +395,17 @@ private:
 //
 // Test for normal array type instead of vector type
 //
+
+template <typename T> 
+struct StorageScalarType{
+    using type = T;
+};
+
+template <> 
+struct StorageScalarType<sycl::half>{
+    using type = _Float16;
+};
+
 template <typename T, int Height, int Width,
          DataShuffle Transpose = DataShuffle::none,
          int SubGroupSize = 16, int ArraySize = 1>
@@ -397,8 +426,7 @@ struct __ArrayMatrix {
     return reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(registerImage_);
   }
   */
-  using storage_scalar_t = typename std::conditional_t<std::is_same_v<sycl::half, T>, _Float16, T>;
-  typedef __attribute__((ext_vector_type(N))) storage_scalar_t storage_type;
+  using storage_type = __attribute__((ext_vector_type(N))) typename StorageScalarType<T>::type ;
   inline storage_type& getStorage() {
     return registerImage_;
   }
@@ -469,13 +497,12 @@ struct __ArrayMatrix {
   }
 
   //
-  // XXX: performance problem for SIMD16/sycl::half when compiler generate
-  // two instructions for single register operation.
+  // Note: due to performance problem for SIMD16/sycl::half that compiler generate
+  // two instructions for single register operation, we use inline asm here
   //
-  inline void zero() {
-    registerImage_ =0;
+  inline void zero(){
+    SetZero<storage_type, NumRegs>::run(registerImage_);
   }
-
 private:
   storage_type registerImage_;
 };
