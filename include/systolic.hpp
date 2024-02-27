@@ -39,6 +39,12 @@ template <
       __ArrayMatrix<IT1, M, K, DataShuffle::none>& A,  /* src2 */
       __ArrayMatrix<IT2, K, N, DataShuffle::vnni>& B   /* src1 */
   );
+
+  template <int M> static inline void run(
+      __ArrayMatrix<OT, M, N, DataShuffle::none>& C,   /* dst/src0 */
+      __ArrayMatrix<IT1, M, K, DataShuffle::none>& A,  /* src2 */
+      __ArrayMatrix<IT2, K, N, DataShuffle::vnni>& B   /* src1 */
+  );
 };
 
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
@@ -62,6 +68,12 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
       __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>&
   );
 
+  template <int M> static inline void run(
+      __ArrayMatrix<OT, M, N, DataShuffle::none>&,
+      __ArrayMatrix<sycl::half, M, K, DataShuffle::none>&,
+      __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>&
+  );
+
 #define GenRepeat(M)  \
   template <> static inline void run<M>(  \
       __ArrayMatrix<OT, M, N, DataShuffle::none>& C,   /* dst */  \
@@ -76,6 +88,20 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
         "}\n" \
         : "=rw"(C.getStorage()): "rw"(Accum.getStorage()),  \
         "rw"(A.getStorage()), "rw"(B.getStorage())  \
+    );  \
+  } \
+  \
+  template <> static inline void run<M>(  \
+      __ArrayMatrix<OT, M, N, DataShuffle::none>& C,   /* dst */  \
+      __ArrayMatrix<sycl::half, M, K, DataShuffle::none>& A,  /* src2 */ \
+      __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */ \
+  ) { \
+    asm volatile ("{\n"  \
+        ".decl aliasA v_type=G type=d num_elts=64 align=GRF alias=<%2,0>\n" \
+        ".decl aliasB v_type=G type=d num_elts=128 align=GRF alias=<%3,0>\n"\
+        "dpas.hf.hf.8." str(M) " (M1, 16) %0.0 %1.0 aliasB.0 aliasA(0, 0)\n"  \
+        "}\n" \
+        : "+rw"(C.getStorage()): "rw"(A.getStorage()), "rw"(B.getStorage())  \
     );  \
   }
 
