@@ -78,6 +78,8 @@ def generate_ecode(op, data_size, des_len, shuf, cache):
 
     base = base | (data_size << 9)
     base = base | (cache.value << 17)
+    if des_len == 32:
+        des_len = 31
     base = base | (des_len << 20)
     base = base | (1 << 25)
     return hex(base)
