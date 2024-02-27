@@ -1,6 +1,6 @@
 CC=clang
 CXX=clang++
-OPT_FLAGS=-g -O3 -ffast-math
+OPT_FLAGS=-O3 -ffast-math
 
 ENABLE_AOT=pvc
 
@@ -22,7 +22,7 @@ LINKTARGET=-Xsycl-target-backend=nvptx64-nvidia-cuda '--cuda-gpu-arch=sm_86'
 OFFLOAD=sycl-nvptx64-nvidia-cuda
 else
 TARGET=spir64_gen
-LINKTARGET=-Xsycl-target-backend=spir64_gen "-device $(ENABLE_AOT)"
+LINKTARGET=-Xsycl-target-backend=spir64_gen "-device $(ENABLE_AOT) -internal_options -cl-intel-256-GRF-per-thread"
 OFFLOAD=sycl-spir64_gen-unknown-unknown
 endif
 
@@ -90,6 +90,12 @@ good_2d_load_store : good_2d_load_store.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
 lsc_uncache_32_and_16 : lsc_uncache_32_and_16.o ../sycl_misc.o
+	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
+
+benchmark_mma : benchmark_mma.o ../sycl_misc.o
+	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
+
+unit_dpas_addresspayloads : unit_dpas_addresspayloads.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
 all : $(test_execs)

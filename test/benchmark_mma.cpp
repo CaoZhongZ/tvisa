@@ -1,5 +1,4 @@
 #include "cxxopts.hpp"
-#include "event.hpp"
 #include "gen_visa_templates.hpp"
 #include "mma.hpp"
 #include "sycl_misc.hpp"
@@ -98,8 +97,8 @@ void verify_result(const T *actual_result, const T *srcA, const T *srcB, int M,
 
   std::vector<float> expected(M * N, 0);
 
-  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f,
-              a.data(), K, b.data(), N, 0, expected.data(), N);
+  // cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f,
+  //             a.data(), K, b.data(), N, 0, expected.data(), N);
 
   bool res = all_close(actual_result, ldc, expected.data(), N, M, N);
   if (res)

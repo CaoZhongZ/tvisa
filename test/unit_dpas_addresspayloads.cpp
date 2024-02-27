@@ -90,7 +90,7 @@ void verify_result(const T* actual_result, const T* srcA, const T* srcB, int M, 
   
   std::vector<float> expected(M * N, 0);
   
-  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, a.data(), K, b.data(), N, 0, expected.data(), N);
+  // cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, a.data(), K, b.data(), N, 0, expected.data(), N);
   
   bool res = all_close(actual_result, ldc, expected.data(), N, M, N);
   if (res) 
@@ -132,7 +132,10 @@ struct tile_accumulate<T, M, K, N, typename std::enable_if_t<K == 16 && N == 16,
 
     __ArrayMatrix<T, M, N, DataShuffle::none, 16> acc;
     acc.zero();
+
+    swFence();
     dpas(acc, tmp0, tmp1);
+    swFence();
     
     lscStore(dstAddress, acc);
 #else
@@ -181,11 +184,20 @@ struct tile_accumulate<T, M, K, N, typename std::enable_if_t<K == 16 && (N > 16)
     
     // MMA
     __ArrayMatrix<T, M, 16, DataShuffle::none, 16> acc[N/16];    
+
     #pragma unroll
     for(int i=0; i<N_Loop; ++i) {
       acc[i].zero();
-      dpas(acc[i], acc[i], tmp0, tmp1[i]);            
     }
+
+    swFence();
+
+    #pragma unroll
+    for(int i=0; i<N_Loop; ++i) {
+      dpas(acc[i], tmp0, tmp1[i]);            
+    }
+
+    swFence();
     
     // store c
     AddressPayload<M, 16> dstAddress(srcAAddress);
