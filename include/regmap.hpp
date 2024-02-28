@@ -503,6 +503,10 @@ struct __ArrayMatrix {
   inline void zero(){
     SetZero<storage_type, NumRegs>::run(registerImage_);
   }
+  
+  inline void one() {
+    registerImage_ = 1;
+  }
 private:
   storage_type registerImage_;
 };

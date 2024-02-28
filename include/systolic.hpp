@@ -225,22 +225,22 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
     );
   }
 
-  template <> static inline void run<32>(
-      __ArrayMatrix<float, 32, N, DataShuffle::none>& C,   /* dst */
-      __ArrayMatrix<sycl::half, 32, K, DataShuffle::none>& A,  /* src2 */
-      __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */
-  ) {
-    asm volatile ("{\n"
-        ".decl aliasA v_type=G type=d num_elts=256 align=GRF alias=<%1,0>\n"
-        ".decl aliasB v_type=G type=d num_elts=128 align=GRF alias=<%2,0>\n"
-        "dpas.hf.hf.8.8 (M1, 16) %0.0 %0.0 aliasB.0 aliasA(0, 0)\n"
-        "dpas.hf.hf.8.8 (M1, 16) %0.512 %0.512 aliasB.0 aliasA(4, 0)\n"
-        "dpas.hf.hf.8.8 (M1, 16) %0.1024 %0.1024 aliasB.0 aliasA(8, 0)\n"
-        "dpas.hf.hf.8.8 (M1, 16) %0.1536 %0.1536 aliasB.0 aliasA(12, 0)\n"
-        "}\n"
-        : "+rw"(C.getStorage()): "rw"(A.getStorage()), "rw"(B.getStorage())
-    );
-  }
+  // template <> static inline void run<32>(
+  //     __ArrayMatrix<float, 32, N, DataShuffle::none>& C,   /* dst */
+  //     __ArrayMatrix<sycl::half, 32, K, DataShuffle::none>& A,  /* src2 */
+  //     __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */
+  // ) {
+  //   asm volatile ("{\n"
+  //       ".decl aliasA v_type=G type=d num_elts=256 align=GRF alias=<%1,0>\n"
+  //       ".decl aliasB v_type=G type=d num_elts=128 align=GRF alias=<%2,0>\n"
+  //       "dpas.hf.hf.8.8 (M1, 16) %0.0 %0.0 aliasB.0 aliasA(0, 0)\n"
+  //       "dpas.hf.hf.8.8 (M1, 16) %0.512 %0.512 aliasB.0 aliasA(4, 0)\n"
+  //       "dpas.hf.hf.8.8 (M1, 16) %0.1024 %0.1024 aliasB.0 aliasA(8, 0)\n"
+  //       "dpas.hf.hf.8.8 (M1, 16) %0.1536 %0.1536 aliasB.0 aliasA(12, 0)\n"
+  //       "}\n"
+  //       : "+rw"(C.getStorage()): "rw"(A.getStorage()), "rw"(B.getStorage())
+  //   );
+  // }
 };
 
 // using bf16 = sycl::ext::oneapi::bfloat16;
