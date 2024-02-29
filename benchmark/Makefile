@@ -1,6 +1,6 @@
 CC=clang
 CXX=clang++
-OPT_FLAGS=-g -O3 -ffast-math
+OPT_FLAGS=-O3 -ffast-math
 
 ENABLE_AOT=pvc
 
@@ -29,7 +29,7 @@ endif
 V=
 CXXFLAGS=-std=c++17 $(OPT_FLAGS) -Wall -Wno-deprecated-declarations -Wno-unused-variable -Wno-vla-cxx-extension -I../include -I..
 SYCLFLAGS=-fsycl -fsycl-id-queries-fit-in-int -fsycl-default-sub-group-size=16 -D__SYCL_INTERNAL_API -fsycl-targets=$(TARGET)
-LINKFLAGS=$(OPT_FLAGS) -fsycl -lblas -fsycl-max-parallel-link-jobs=8 -fsycl-targets=$(TARGET) $(LINKTARGET)
+LINKFLAGS=$(OPT_FLAGS) -fsycl -lblas -fsycl-max-parallel-link-jobs=1 -fsycl-targets=$(TARGET) $(LINKTARGET)
 
 .PRECIOUS : %-xe.o %.host.o %.dev.bc %.footer.hpp
 

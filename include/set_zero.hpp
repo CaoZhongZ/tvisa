@@ -7,28 +7,28 @@ template <typename T, int N> struct SetZero;
 #define CONCAT(A, B) _CONCAT(A, B)
 #define _CONCAT(A, B) A##B
 
-#define _MOV1 "mov (M1, 16) alias_(0, 0)<1> V0(0, 0)<1;1,0>\n"
-#define _MOV2 _MOV1 "mov (M1, 16) alias_(1, 0)<1> V0(0, 0)<1;1,0>\n"
+#define _MOV1 "mov (M1, 16) alias_(0, 0)<1> 0:ud\n"
+#define _MOV2 _MOV1 "mov (M1, 16) alias_(1, 0)<1> 0:ud\n"
 
 #define _MOV4                                                   \
-  _MOV2 "mov (M1, 16) alias_(2, 0)<1> V0(0,0)<1;1,0>\n"          \
-        "mov (M1, 16) alias_(3, 0)<1> V0(0,0)<1;1,0>\n"
+  _MOV2 "mov (M1, 16) alias_(2, 0)<1> 0:ud\n"          \
+        "mov (M1, 16) alias_(3, 0)<1> 0:ud\n"
 
 #define _MOV8                                                   \
-  _MOV4 "mov (M1, 16) alias_(4, 0)<1> V0(0,0)<1;1,0>\n"          \
-        "mov (M1, 16) alias_(5, 0)<1> V0(0,0)<1;1,0>\n"          \
-        "mov (M1, 16) alias_(6, 0)<1> V0(0,0)<1;1,0>\n"          \
-        "mov (M1, 16) alias_(7, 0)<1> V0(0,0)<1;1,0>\n"
+  _MOV4 "mov (M1, 16) alias_(4, 0)<1> 0:ud\n"          \
+        "mov (M1, 16) alias_(5, 0)<1> 0:ud\n"          \
+        "mov (M1, 16) alias_(6, 0)<1> 0:ud\n"          \
+        "mov (M1, 16) alias_(7, 0)<1> 0:ud\n"
 
 #define _MOV16                                                  \
-  _MOV8 "mov (M1, 16) alias_(8, 0)<1> V0(0,0)<1;1,0>\n"          \
-        "mov (M1, 16) alias_(9, 0)<1> V0(0,0)<1;1,0>\n"          \
-        "mov (M1, 16) alias_(10, 0)<1> V0(0,0)<1;1,0>\n"         \
-        "mov (M1, 16) alias_(11, 0)<1> V0(0,0)<1;1,0>\n"         \
-        "mov (M1, 16) alias_(12, 0)<1> V0(0,0)<1;1,0>\n"         \
-        "mov (M1, 16) alias_(13, 0)<1> V0(0,0)<1;1,0>\n"         \
-        "mov (M1, 16) alias_(14, 0)<1> V0(0,0)<1;1,0>\n"         \
-        "mov (M1, 16) alias_(15, 0)<1> V0(0,0)<1;1,0>\n"
+  _MOV8 "mov (M1, 16) alias_(8, 0)<1> 0:ud\n"          \
+        "mov (M1, 16) alias_(9, 0)<1> 0:ud\n"          \
+        "mov (M1, 16) alias_(10, 0)<1> 0:ud\n"         \
+        "mov (M1, 16) alias_(11, 0)<1> 0:ud\n"         \
+        "mov (M1, 16) alias_(12, 0)<1> 0:ud\n"         \
+        "mov (M1, 16) alias_(13, 0)<1> 0:ud\n"         \
+        "mov (M1, 16) alias_(14, 0)<1> 0:ud\n"         \
+        "mov (M1, 16) alias_(15, 0)<1> 0:ud\n"
 
 template <typename T> struct SetZero<T, 4> {
   static inline void run(T &target) {

@@ -140,14 +140,11 @@ template <typename T> struct MMAKernelImpl {
     constexpr const int segment_m = sg_tile_m / mma_m;
     constexpr const int segment_n = sg_tile_n / mma_n;
     constexpr const int segment_k = k_stride / mma_k;
+
     __ArrayMatrix<T, mma_m, mma_n, DataShuffle::none, sg_size> acc0;
     __ArrayMatrix<T, mma_m, mma_n, DataShuffle::none, sg_size> acc1;
     __ArrayMatrix<T, mma_m, mma_n, DataShuffle::none, sg_size> acc2;
     __ArrayMatrix<T, mma_m, mma_n, DataShuffle::none, sg_size> acc3;
-    acc0.zero();
-    acc1.zero();
-    acc2.zero();
-    acc3.zero();
 
     AddressPayload<mma_m, mma_k> a_address(
         (void *)A, (uint32_t)matrix_m,
@@ -158,8 +155,14 @@ template <typename T> struct MMAKernelImpl {
         static_cast<uint32_t>(matrix_n * sizeof(T)),
         static_cast<uint32_t>(matrix_n * sizeof(T)), n_offset, 0);
 
-    AddressPayload<mma_m, mma_k>  prefetch_a_address(a_address);
-    AddressPayload<mma_k, mma_n> prefetch_b_address(b_address);
+    acc0.zero();
+    acc1.zero();
+    acc2.zero();
+    acc3.zero();
+
+
+    // AddressPayload<mma_m, mma_k>  prefetch_a_address(a_address);
+    // AddressPayload<mma_k, mma_n> prefetch_b_address(b_address);
     // load A
     __ArrayMatrix<T, mma_m, mma_k, DataShuffle::none, sg_size> mat_a;
     lscLoad<CacheCtrl::L1C_L3C>(mat_a, a_address);
@@ -179,6 +182,7 @@ template <typename T> struct MMAKernelImpl {
     lscLoad<CacheCtrl::L1C_L3C>(mat_b3_acc, b_address);
 
     asm("fence_sw");
+
     for (int k = 0; k < k_loop; ++k) {
 
       // if constexpr (prefetch_stage != 0) {
@@ -194,6 +198,7 @@ template <typename T> struct MMAKernelImpl {
       dpas(acc1, mat_a, mat_b1_acc);
       dpas(acc2, mat_a, mat_b2_acc);
       dpas(acc3, mat_a, mat_b3_acc);
+
       asm("fence_sw");
       // if constexpr (prefetch_stage != 0) {
       //   prefetch_a_address.addSrc0AddrX();
@@ -206,6 +211,7 @@ template <typename T> struct MMAKernelImpl {
         (void *)C, (uint32_t)matrix_m,
         static_cast<uint32_t>(matrix_n * sizeof(T)),
         static_cast<uint32_t>(matrix_n * sizeof(T)), n_offset, m_offset);
+
     lscStore<CacheCtrl::L1WB_L3WB>(c_address, acc0);
     c_address.addSrc0AddrY(mma_n);
     lscStore<CacheCtrl::L1WB_L3WB>(c_address, acc1);
@@ -219,6 +225,7 @@ template <typename T> struct MMAKernelImpl {
     C[id] = A[id] + B[id];
 #endif
   }
+
   const T *A;
   const T *B;
   T *C;
