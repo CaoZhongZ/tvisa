@@ -141,10 +141,7 @@ template <typename T> struct MMAKernelImpl {
     constexpr const int segment_n = sg_tile_n / mma_n;
     constexpr const int segment_k = k_stride / mma_k;
 
-    __ArrayMatrix<T, mma_m, mma_n, DataShuffle::none, sg_size> acc0;
-    __ArrayMatrix<T, mma_m, mma_n, DataShuffle::none, sg_size> acc1;
-    __ArrayMatrix<T, mma_m, mma_n, DataShuffle::none, sg_size> acc2;
-    __ArrayMatrix<T, mma_m, mma_n, DataShuffle::none, sg_size> acc3;
+    __ArrayMatrix<T, mma_m, mma_n, DataShuffle::none, sg_size> acc[4];
 
     AddressPayload<mma_m, mma_k> a_address(
         (void *)A, (uint32_t)matrix_m,
@@ -154,12 +151,10 @@ template <typename T> struct MMAKernelImpl {
         (void *)B, (uint32_t)matrix_k,
         static_cast<uint32_t>(matrix_n * sizeof(T)),
         static_cast<uint32_t>(matrix_n * sizeof(T)), n_offset, 0);
-
-    acc0.zero();
-    acc1.zero();
-    acc2.zero();
-    acc3.zero();
-
+    AddressPayload<mma_m, mma_n> c_address(
+        (void *)C, (uint32_t)matrix_m,
+        static_cast<uint32_t>(matrix_k * sizeof(T)),
+        static_cast<uint32_t>(matrix_k * sizeof(T)), n_offset, m_offset);
 
     // AddressPayload<mma_m, mma_k>  prefetch_a_address(a_address);
     // AddressPayload<mma_k, mma_n> prefetch_b_address(b_address);
@@ -168,18 +163,24 @@ template <typename T> struct MMAKernelImpl {
     lscLoad<CacheCtrl::L1C_L3C>(mat_a, a_address);
 
     // load B
-    __ArrayMatrix<T, mma_k, mma_n, DataShuffle::vnni, sg_size> mat_b0_acc;
-    __ArrayMatrix<T, mma_k, mma_n, DataShuffle::vnni, sg_size> mat_b1_acc;
-    __ArrayMatrix<T, mma_k, mma_n, DataShuffle::vnni, sg_size> mat_b2_acc;
-    __ArrayMatrix<T, mma_k, mma_n, DataShuffle::vnni, sg_size> mat_b3_acc;
+    __ArrayMatrix<T, mma_k, mma_n, DataShuffle::vnni, sg_size> mat_b0;
+    __ArrayMatrix<T, mma_k, mma_n, DataShuffle::vnni, sg_size> mat_b1;
+    __ArrayMatrix<T, mma_k, mma_n, DataShuffle::vnni, sg_size> mat_b2;
+    __ArrayMatrix<T, mma_k, mma_n, DataShuffle::vnni, sg_size> mat_b3;
 
-    lscLoad<CacheCtrl::L1C_L3C>(mat_b0_acc, b_address);
+    lscLoad<CacheCtrl::L1C_L3C>(mat_b0, b_address);
     b_address.addSrc0AddrX(mma_n);
-    lscLoad<CacheCtrl::L1C_L3C>(mat_b1_acc, b_address);
+    lscLoad<CacheCtrl::L1C_L3C>(mat_b1, b_address);
     b_address.addSrc0AddrX(mma_n);
-    lscLoad<CacheCtrl::L1C_L3C>(mat_b2_acc, b_address);
+    lscLoad<CacheCtrl::L1C_L3C>(mat_b2, b_address);
     b_address.addSrc0AddrX(mma_n);
-    lscLoad<CacheCtrl::L1C_L3C>(mat_b3_acc, b_address);
+    lscLoad<CacheCtrl::L1C_L3C>(mat_b3, b_address);
+
+#   pragma unroll
+    for (int i = 0; i < 4; ++ 0) {
+      acc[i].load(c_address);
+      c_address.addSrc0AddrX(mma_n);
+    }
 
     asm("fence_sw");
 
@@ -194,10 +195,10 @@ template <typename T> struct MMAKernelImpl {
 
       asm("fence_sw");
       // mma
-      dpas(acc0, mat_a, mat_b0_acc);
-      dpas(acc1, mat_a, mat_b1_acc);
-      dpas(acc2, mat_a, mat_b2_acc);
-      dpas(acc3, mat_a, mat_b3_acc);
+      dpas(acc[0], mat_a, mat_b0);
+      dpas(acc[1], mat_a, mat_b1);
+      dpas(acc[2], mat_a, mat_b2);
+      dpas(acc[3], mat_a, mat_b3);
 
       asm("fence_sw");
       // if constexpr (prefetch_stage != 0) {
@@ -212,13 +213,13 @@ template <typename T> struct MMAKernelImpl {
         static_cast<uint32_t>(matrix_n * sizeof(T)),
         static_cast<uint32_t>(matrix_n * sizeof(T)), n_offset, m_offset);
 
-    lscStore<CacheCtrl::L1WB_L3WB>(c_address, acc0);
+    lscStore<CacheCtrl::L1WB_L3WB>(c_address, acc[0]);
     c_address.addSrc0AddrY(mma_n);
-    lscStore<CacheCtrl::L1WB_L3WB>(c_address, acc1);
+    lscStore<CacheCtrl::L1WB_L3WB>(c_address, acc[1]);
     c_address.addSrc0AddrY(mma_n);
-    lscStore<CacheCtrl::L1WB_L3WB>(c_address, acc2);
+    lscStore<CacheCtrl::L1WB_L3WB>(c_address, acc[2]);
     c_address.addSrc0AddrY(mma_n);
-    lscStore<CacheCtrl::L1WB_L3WB>(c_address, acc3);
+    lscStore<CacheCtrl::L1WB_L3WB>(c_address, acc[3]);
 
 #else
     auto id = item.get_global_linear_id();
@@ -243,11 +244,13 @@ sycl::event compute_kernel(sycl::queue &q, const T *A, const T *B, T *C,
 
   sycl::range<3> local_range(wg_size_m, wg_size_n, sg_size);
   sycl::range<3> global_range(num_wg_m, num_wg_n, 1);
+  MMAKernelImpl<T> task(A, B, C, matrix_m, matrix_k, matrix_n);
 
   auto evt = q.submit([&](sycl::handler &cgh) {
-    MMAKernelImpl<T> task(A, B, C, matrix_m, matrix_k, matrix_n);
-    cgh.parallel_for(sycl::nd_range<3>(global_range * local_range, local_range),
-                     task);
+    cgh.parallel_for(
+        sycl::nd_range<3>(global_range * local_range, local_range),
+        task
+    );
   });
   return evt;
 }
