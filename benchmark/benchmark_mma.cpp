@@ -15,14 +15,13 @@ constexpr const int wg_tile_n = 256;
 constexpr const int wg_size_m = wg_tile_m / sg_tile_m;
 constexpr const int wg_size_n = wg_tile_n / sg_tile_n;
 constexpr const int k_stride = 16;
-constexpr const int k_unroll = 8;
+constexpr const int k_unroll = 0;
 
-constexpr const int prefetch_stage = 0;
+constexpr const int prefetch_stage = 3;
 
 template <typename result_type>
 inline result_type generate_random(result_type a = -0.5, result_type b = 0.5) {
-  unsigned seed =
-  std::chrono::system_clock::now().time_since_epoch().count();
+  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
   std::default_random_engine engine(seed);
   std::uniform_real_distribution<result_type> distribution(a, b);
 
@@ -97,8 +96,8 @@ void verify_result(const T *actual_result, const T *srcA, const T *srcB, int M,
 
   std::vector<float> expected(M * N, 0);
 
-  // cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f,
-  //             a.data(), K, b.data(), N, 0, expected.data(), N);
+  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f,
+              a.data(), K, b.data(), N, 0, expected.data(), N);
 
   bool res = all_close(actual_result, ldc, expected.data(), N, M, N);
   if (res)
@@ -158,59 +157,23 @@ template <typename T> struct MMAKernelImpl {
         static_cast<uint32_t>(matrix_n * sizeof(T)),
         static_cast<uint32_t>(matrix_n * sizeof(T)), n_offset, 0);
 
-    AddressPayload<mma_m, mma_k> prefetch_a_address(a_address);
-    AddressPayload<mma_k, mma_n> prefetch_b_address(b_address);
+    AddressPayload<sg_tile_m / wg_size_n, mma_k> prefetch_a_address(a_address);
+    prefetch_a_address.addSrc0AddrY(sg_id_n * (sg_tile_m / wg_size_n));
+    AddressPayload<mma_k, sg_tile_n / wg_size_m> prefetch_b_address(b_address);
+    prefetch_b_address.addSrc0AddrX(sg_id_m * (sg_tile_n / wg_size_m));
     for (int i = 0; i < prefetch_stage; ++i) {
-
-      int pre_k_start = (sg_id_m + sg_id_n + i) % k_unroll;
-      prefetch_a_address.updateSrc0AddrX(k_stride * pre_k_start);
-      prefetch_b_address.updateSrc0AddrY(k_stride * pre_k_start);               
-      
-      // prefetch a
-      for (int im = 0; im < segment_m; ++im) {
-        AddressPayload<mma_m, mma_k> prefetch_a_block_address(
-            prefetch_a_address);
-        prefetch_a_block_address.addSrc0AddrY(im * mma_m);
-
-        lscPrefetch<CacheCtrl::L1C_L3C, T, mma_m, mma_k, DataShuffle::none,
-                    sg_size>(prefetch_a_block_address);
-        for (int ik = 1; ik < segment_k; ++ik) {
-          prefetch_a_block_address.addSrc0AddrX(mma_k);
-          lscPrefetch<CacheCtrl::L1C_L3C, T, mma_m, mma_k, DataShuffle::none,
-                      sg_size>(prefetch_a_block_address);
-        }
-      }
-
-      // prefetch b
       for (int ik = 0; ik < segment_k; ++ik) {
-        AddressPayload<mma_k, mma_n> prefetch_b_block_address(
-            prefetch_b_address);
-        prefetch_b_block_address.addSrc0AddrY(ik * mma_k);
-
-        lscPrefetch<CacheCtrl::L1C_L3C, T, mma_k, mma_n, DataShuffle::vnni,
-                sg_size>(prefetch_b_block_address);
-        for (int in = 1; in < segment_n; ++in) {
-          prefetch_b_block_address.addSrc0AddrX(mma_n);
-          lscPrefetch<CacheCtrl::L1C_L3C, T, mma_k, mma_n, DataShuffle::vnni,
-                  sg_size>(prefetch_b_block_address);
-        }
+        lscPrefetch<CacheCtrl::L1C_L3C, T, sg_tile_m / wg_size_n, mma_k,
+                    DataShuffle::none, sg_size>(prefetch_a_address);
+        lscPrefetch<CacheCtrl::L1C_L3C, T, mma_k, sg_tile_n / wg_size_m,
+                    DataShuffle::vnni, sg_size>(prefetch_b_address);
+        prefetch_a_address.addSrc0AddrX(k_stride);
+        prefetch_b_address.addSrc0AddrY(k_stride);
       }
-      prefetch_a_address.addSrc0AddrX(k_stride);
-      prefetch_b_address.addSrc0AddrY(k_stride);
     }
 
-    for (int k = 0; k < k_loop; k+= k_unroll) {
-      for(int kk=0; kk<k_unroll; ++kk) {
-      int k_start = (sg_id_m + sg_id_n + k + kk) % k_unroll;
-      a_address.updateSrc0AddrX(k_stride * (k + k_start));
-      b_address.updateSrc0AddrY(k_stride * (k + k_start));      
-      
-      if constexpr (prefetch_stage != 0){
-      int pre_k_start = (sg_id_m + sg_id_n + k + kk + prefetch_stage) % k_unroll;      
-      prefetch_a_address.updateSrc0AddrX(k_stride * pre_k_start);
-      prefetch_b_address.updateSrc0AddrY(k_stride * pre_k_start);        
-      }
-      
+    for (int k = 0; k < k_loop; ++k) {
+
       // load A
       __ArrayMatrix<T, mma_m, mma_k, DataShuffle::none, sg_size>
           mat_a[segment_m][segment_k];
@@ -240,54 +203,29 @@ template <typename T> struct MMAKernelImpl {
       }
 
       if constexpr (prefetch_stage != 0) {
-        // prefetch a
-        for (int im = 0; im < segment_m; ++im) {
-          AddressPayload<mma_m, mma_k> prefetch_a_block_address(
-              prefetch_a_address);
-          prefetch_a_block_address.addSrc0AddrY(im * mma_m);
-
-          lscPrefetch<CacheCtrl::L1C_L3C, T, mma_m, mma_k, DataShuffle::none,
-                      sg_size>(prefetch_a_block_address);
-          for (int ik = 1; ik < segment_k; ++ik) {
-            prefetch_a_block_address.addSrc0AddrX(mma_k);
-            lscPrefetch<CacheCtrl::L1C_L3C, T, mma_m, mma_k, DataShuffle::none,
-                        sg_size>(prefetch_a_block_address);
-          }
-        }
-
-        // prefetch b
         for (int ik = 0; ik < segment_k; ++ik) {
-          AddressPayload<mma_k, mma_n> prefetch_b_block_address(
-              prefetch_b_address);
-          prefetch_b_block_address.addSrc0AddrY(ik * mma_k);
-
-          lscPrefetch<CacheCtrl::L1C_L3C, T, mma_k, mma_n, DataShuffle::vnni,
-                  sg_size>(prefetch_b_block_address);
-          for (int in = 1; in < segment_n; ++in) {
-            prefetch_b_block_address.addSrc0AddrX(mma_n);
-            lscPrefetch<CacheCtrl::L1C_L3C, T, mma_k, mma_n, DataShuffle::vnni,
-                    sg_size>(prefetch_b_block_address);
-          }
+          lscPrefetch<CacheCtrl::L1C_L3C, T, sg_tile_m / wg_size_n, mma_k,
+                      DataShuffle::none, sg_size>(prefetch_a_address);
+          lscPrefetch<CacheCtrl::L1C_L3C, T, mma_k, sg_tile_n / wg_size_m,
+                      DataShuffle::vnni, sg_size>(prefetch_b_address);
+          prefetch_a_address.addSrc0AddrX(k_stride);
+          prefetch_b_address.addSrc0AddrY(k_stride);
         }
-      }      
-
+      }
       asm("fence_sw");
       // mma
       for (int ik = 0; ik < segment_k; ++ik) {
         for (int im = 0; im < segment_m; ++im) {
           for (int in = 0; in < segment_n; ++in) {
-            dpas(acc[im][in], acc[im][in], mat_a[im][ik], mat_b[ik][in]);
+            dpas(acc[im][in], mat_a[im][ik], mat_b[ik][in]);
           }
         }
       }
-      // dpas<mma_m, mma_k, mma_n>(acc, acc, mat_a, mat_b);
-      // a_address.addSrc0AddrX(k_stride);
-      // b_address.addSrc0AddrY(k_stride);      
+      asm("fence_sw");
 
-      // prefetch_a_address.addSrc0AddrX(k_stride);
-      // prefetch_b_address.addSrc0AddrY(k_stride);
-    }   
-  }
+      a_address.addSrc0AddrX(k_stride);
+      b_address.addSrc0AddrY(k_stride);
+    }
 
     // store c
     AddressPayload<mma_m, mma_n> c_address(
