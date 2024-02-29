@@ -50,8 +50,8 @@ template <
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 
 // cover half, PVC
-template <typename OT, typename AccumT>
-struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
+template <>
+struct Dpas<sycl::half, sycl::half, sycl::half, sycl::half, systolic_config> {
   static constexpr int Depth = systolic_config::Depth;
   static constexpr int Width = systolic_config::Width;
 
@@ -62,22 +62,22 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
   static constexpr int N = Width * Src1ElemsPerChan; /* 16 */
 
   template <int M> static inline void run(
-      __ArrayMatrix<OT, M, N, DataShuffle::none>&,
-      __ArrayMatrix<AccumT, M, N, DataShuffle::none>&,
+      __ArrayMatrix<sycl::half, M, N, DataShuffle::none>&,
+      __ArrayMatrix<sycl::half, M, N, DataShuffle::none>&,
       __ArrayMatrix<sycl::half, M, K, DataShuffle::none>&,
       __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>&
   );
 
   template <int M> static inline void run(
-      __ArrayMatrix<OT, M, N, DataShuffle::none>&,
+      __ArrayMatrix<sycl::half, M, N, DataShuffle::none>&,
       __ArrayMatrix<sycl::half, M, K, DataShuffle::none>&,
       __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>&
   );
 
 #define GenRepeat(M)  \
-  template <> static inline void run<M>(  \
-      __ArrayMatrix<OT, M, N, DataShuffle::none>& C,   /* dst */  \
-      __ArrayMatrix<AccumT, M, N, DataShuffle::none>& Accum, /* src0 */ \
+  template <> inline void run<M>(  \
+      __ArrayMatrix<sycl::half, M, N, DataShuffle::none>& C,   /* dst */  \
+      __ArrayMatrix<sycl::half, M, N, DataShuffle::none>& Accum, /* src0 */ \
       __ArrayMatrix<sycl::half, M, K, DataShuffle::none>& A,  /* src2 */ \
       __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */ \
   ) { \
@@ -91,8 +91,8 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
     );  \
   } \
   \
-  template <> static inline void run<M>(  \
-      __ArrayMatrix<OT, M, N, DataShuffle::none>& C,   /* dst */  \
+  template <> inline void run<M>(  \
+      __ArrayMatrix<sycl::half, M, N, DataShuffle::none>& C,   /* dst */  \
       __ArrayMatrix<sycl::half, M, K, DataShuffle::none>& A,  /* src2 */ \
       __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */ \
   ) { \
@@ -133,7 +133,7 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
 #undef GenRepeat
 
   template <>
-  static inline void run<16>(
+  inline void run<16>(
       __ArrayMatrix<sycl::half, 16, N, DataShuffle::none>& C,   /* dst */
       __ArrayMatrix<sycl::half, 16, N, DataShuffle::none>& Accum, /* src0 */
       __ArrayMatrix<sycl::half, 16, K, DataShuffle::none>& A,  /* src2 */
@@ -151,7 +151,7 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
   }
 
   template <>
-  static inline void run<16>(
+  inline void run<16>(
       __ArrayMatrix<sycl::half, 16, N, DataShuffle::none>& C,   /* dst */
       __ArrayMatrix<sycl::half, 16, K, DataShuffle::none>& A,  /* src2 */
       __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */
@@ -167,7 +167,7 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
   }
 
   template <>
-  static inline void run<32>(
+  inline void run<32>(
       __ArrayMatrix<sycl::half, 32, N, DataShuffle::none>& C,   /* dst */
       __ArrayMatrix<sycl::half, 32, N, DataShuffle::none>& Accum, /* src0 */
       __ArrayMatrix<sycl::half, 32, K, DataShuffle::none>& A,  /* src2 */
@@ -187,7 +187,7 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
   }
 
 #define repeatDpas32(dstType, srcType, dstTLen, srcTLen) \
-  template <> static inline void run<32>(  \
+  template <> inline void run<32>(  \
       __ArrayMatrix<dstType, 32, N, DataShuffle::none>& C,   /* dst */  \
       __ArrayMatrix<srcType, 32, K, DataShuffle::none>& A,  /* src2 */ \
       __ArrayMatrix<srcType, K, N, DataShuffle::vnni>& B   /* src1 */\
@@ -208,7 +208,7 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
   // repeatDpas32(float, sycl::half, 4, 2);
   // repeatDpas32(sycl::half, sycl::half, 2, 2);
 
-  template <> static inline void run<32>(
+  template <> inline void run<32>(
       __ArrayMatrix<sycl::half, 32, N, DataShuffle::none>& C,   /* dst */
       __ArrayMatrix<sycl::half, 32, K, DataShuffle::none>& A,  /* src2 */
       __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */
@@ -224,23 +224,6 @@ struct Dpas<OT, AccumT, sycl::half, sycl::half, systolic_config> {
         : "+rw"(C.getStorage()): "rw"(A.getStorage()), "rw"(B.getStorage())
     );
   }
-
-  // template <> static inline void run<32>(
-  //     __ArrayMatrix<float, 32, N, DataShuffle::none>& C,   /* dst */
-  //     __ArrayMatrix<sycl::half, 32, K, DataShuffle::none>& A,  /* src2 */
-  //     __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni>& B   /* src1 */
-  // ) {
-  //   asm volatile ("{\n"
-  //       ".decl aliasA v_type=G type=d num_elts=256 align=GRF alias=<%1,0>\n"
-  //       ".decl aliasB v_type=G type=d num_elts=128 align=GRF alias=<%2,0>\n"
-  //       "dpas.hf.hf.8.8 (M1, 16) %0.0 %0.0 aliasB.0 aliasA(0, 0)\n"
-  //       "dpas.hf.hf.8.8 (M1, 16) %0.512 %0.512 aliasB.0 aliasA(4, 0)\n"
-  //       "dpas.hf.hf.8.8 (M1, 16) %0.1024 %0.1024 aliasB.0 aliasA(8, 0)\n"
-  //       "dpas.hf.hf.8.8 (M1, 16) %0.1536 %0.1536 aliasB.0 aliasA(12, 0)\n"
-  //       "}\n"
-  //       : "+rw"(C.getStorage()): "rw"(A.getStorage()), "rw"(B.getStorage())
-  //   );
-  // }
 };
 
 // using bf16 = sycl::ext::oneapi::bfloat16;
