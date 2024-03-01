@@ -153,14 +153,14 @@ template <typename T> struct MMAKernelImpl {
         static_cast<uint32_t>(matrix_n * sizeof(T)), n_offset, 0);
     AddressPayload<mma_m, mma_n> c_address(
         (void *)C, (uint32_t)matrix_m,
-        static_cast<uint32_t>(matrix_k * sizeof(T)),
-        static_cast<uint32_t>(matrix_k * sizeof(T)), n_offset, m_offset);
+        static_cast<uint32_t>(matrix_n * sizeof(T)),
+        static_cast<uint32_t>(matrix_n * sizeof(T)), n_offset, m_offset);
 
     // AddressPayload<mma_m, mma_k>  prefetch_a_address(a_address);
     // AddressPayload<mma_k, mma_n> prefetch_b_address(b_address);
     // load A
     __ArrayMatrix<T, mma_m, mma_k, DataShuffle::none, sg_size> mat_a;
-    lscLoad<CacheCtrl::L1C_L3C>(mat_a, a_address);
+    mat_a.load(a_address);
 
     // load B
     __ArrayMatrix<T, mma_k, mma_n, DataShuffle::vnni, sg_size> mat_b0;
@@ -177,7 +177,7 @@ template <typename T> struct MMAKernelImpl {
     lscLoad<CacheCtrl::L1C_L3C>(mat_b3, b_address);
 
 #   pragma unroll
-    for (int i = 0; i < 4; ++ 0) {
+    for (int i = 0; i < 4; ++ i) {
       acc[i].load(c_address);
       c_address.addSrc0AddrX(mma_n);
     }
@@ -208,11 +208,8 @@ template <typename T> struct MMAKernelImpl {
     }
 
     // store c
-    AddressPayload<mma_m, mma_n> c_address(
-        (void *)C, (uint32_t)matrix_m,
-        static_cast<uint32_t>(matrix_n * sizeof(T)),
-        static_cast<uint32_t>(matrix_n * sizeof(T)), n_offset, m_offset);
 
+    c_address.addSrc0AddrY(-mma_n * 3);
     lscStore<CacheCtrl::L1WB_L3WB>(c_address, acc[0]);
     c_address.addSrc0AddrY(mma_n);
     lscStore<CacheCtrl::L1WB_L3WB>(c_address, acc[1]);
