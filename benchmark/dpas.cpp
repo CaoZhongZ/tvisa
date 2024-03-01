@@ -176,8 +176,8 @@ template <typename T> struct MMAKernelImpl {
     b_address.addSrc0AddrX(mma_n);
     lscLoad<CacheCtrl::L1C_L3C>(mat_b3, b_address);
 
-#   pragma unroll
-    for (int i = 0; i < 4; ++ 0) {
+    #pragma unroll
+    for (int i = 0; i < 4; ++i) {
       acc[i].load(c_address);
       c_address.addSrc0AddrX(mma_n);
     }
@@ -207,11 +207,6 @@ template <typename T> struct MMAKernelImpl {
       // }
     }
 
-    // store c
-    AddressPayload<mma_m, mma_n> c_address(
-        (void *)C, (uint32_t)matrix_m,
-        static_cast<uint32_t>(matrix_n * sizeof(T)),
-        static_cast<uint32_t>(matrix_n * sizeof(T)), n_offset, m_offset);
 
     lscStore<CacheCtrl::L1WB_L3WB>(c_address, acc[0]);
     c_address.addSrc0AddrY(mma_n);

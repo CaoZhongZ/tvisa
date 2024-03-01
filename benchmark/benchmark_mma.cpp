@@ -172,33 +172,40 @@ template <typename T> struct MMAKernelImpl {
       }
     }
 
-    for (int k = 0; k < k_loop; ++k) {
+    AddressPayload<mma_m, mma_k> a_block_address[segment_m][segment_k];
+    AddressPayload<mma_k, mma_n> b_block_address[segment_k][segment_n];
 
+    for (int im = 0; im < segment_m; ++im) {
+      for (int ik = 0; ik < segment_k; ++ik) {
+        a_block_address[im][ik] = a_address;
+        a_block_address[im][ik].addSrc0AddrX(ik * mma_k);
+        a_block_address[im][ik].addSrc0AddrY(im * mma_m);
+      }
+    }
+
+    for (int ik = 0; ik < segment_k; ++ik) {
+      for (int in = 0; in < segment_n; ++in) {
+        b_block_address[ik][in] = b_address;
+        b_block_address[ik][in].addSrc0AddrX(in * mma_n);
+        b_block_address[ik][in].addSrc0AddrY(ik * mma_k);
+      }
+    }
+
+    for (int k = 0; k < k_loop; ++k) {
       // load A
       __ArrayMatrix<T, mma_m, mma_k, DataShuffle::none, sg_size>
           mat_a[segment_m][segment_k];
       for (int im = 0; im < segment_m; ++im) {
-        AddressPayload<mma_m, mma_k> a_block_address(a_address);
-        a_block_address.addSrc0AddrY(im * mma_m);
-
-        lscLoad<CacheCtrl::L1C_L3C>(mat_a[im][0], a_block_address);
-        for (int ik = 1; ik < segment_k; ++ik) {
-          a_block_address.addSrc0AddrX(mma_k);
-          lscLoad<CacheCtrl::L1C_L3C>(mat_a[im][ik], a_block_address);
+        for (int ik = 0; ik < segment_k; ++ik) {
+          lscLoad<CacheCtrl::L1C_L3C>(mat_a[im][ik], a_block_address[im][ik]);
         }
       }
-
       // load B
       __ArrayMatrix<T, mma_k, mma_n, DataShuffle::vnni, sg_size>
           mat_b[segment_k][segment_n];
       for (int ik = 0; ik < segment_k; ++ik) {
-        AddressPayload<mma_k, mma_n> b_block_address(b_address);
-        b_block_address.addSrc0AddrY(ik * mma_k);
-
-        lscLoad<CacheCtrl::L1C_L3C>(mat_b[ik][0], b_block_address);
-        for (int in = 1; in < segment_n; ++in) {
-          b_block_address.addSrc0AddrX(mma_n);
-          lscLoad<CacheCtrl::L1C_L3C>(mat_b[ik][in], b_block_address);
+        for (int in = 0; in < segment_n; ++in) {
+          lscLoad<CacheCtrl::L1C_L3C>(mat_b[ik][in], b_block_address[ik][in]);
         }
       }
 
@@ -208,8 +215,6 @@ template <typename T> struct MMAKernelImpl {
                       DataShuffle::none, sg_size>(prefetch_a_address);
           lscPrefetch<CacheCtrl::L1C_L3C, T, mma_k, sg_tile_n / wg_size_m,
                       DataShuffle::vnni, sg_size>(prefetch_b_address);
-          prefetch_a_address.addSrc0AddrX(k_stride);
-          prefetch_b_address.addSrc0AddrY(k_stride);
         }
       }
       asm("fence_sw");
@@ -223,8 +228,22 @@ template <typename T> struct MMAKernelImpl {
       }
       asm("fence_sw");
 
-      a_address.addSrc0AddrX(k_stride);
-      b_address.addSrc0AddrY(k_stride);
+      if constexpr (prefetch_stage != 0) {
+        prefetch_a_address.addSrc0AddrX(k_stride);
+        prefetch_b_address.addSrc0AddrY(k_stride);
+      }
+
+      for (int im = 0; im < segment_m; ++im) {
+        for (int ik = 0; ik < segment_k; ++ik) {
+          a_block_address[im][ik].addSrc0AddrX(k_stride);
+        }
+      }
+
+      for (int ik = 0; ik < segment_k; ++ik) {
+        for (int in = 0; in < segment_n; ++in) {
+          b_block_address[ik][in].addSrc0AddrY(k_stride);
+        }
+      }
     }
 
     // store c
