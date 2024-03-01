@@ -45,8 +45,8 @@ spirv_ext=-all,+SPV_EXT_shader_atomic_float_add,+SPV_EXT_shader_atomic_float_min
 
 # compatible to different versions
 %.o : %.dev.bc %.host.o
-	-clang-offload-bundler -type=o -targets=$(OFFLOAD),host-x86_64-unknown-linux-gnu -output=$@ -input=$*.dev.bc,$*.host.o
-	-clang-offload-bundler -type=o -targets=$(OFFLOAD),host-x86_64-unknown-linux-gnu -output=$@ -inputs=$*.dev.bc,$*.host.o
+	# -clang-offload-bundler -type=o -targets=$(OFFLOAD),host-x86_64-unknown-linux-gnu -output=$@ -input=$*.dev.bc,$*.host.o
+	clang-offload-bundler -type=o -targets=$(OFFLOAD),host-x86_64-unknown-linux-gnu -output=$@ -inputs=$*.dev.bc,$*.host.o
 
 %.debug : %.o
 	# clang-offload-bundler -type=o -targets=sycl-spir64-unknown-unknown -input=$< -check-section 
@@ -79,7 +79,7 @@ spirv_ext=-all,+SPV_EXT_shader_atomic_float_add,+SPV_EXT_shader_atomic_float_min
 	sycl-post-link -split=auto -emit-param-info -symbols -emit-exported-symbols -split-esimd -lower-esimd -O3 -spec-const=emulation -device-globals -o ./tmp/$<.table ./tmp/$<-xe-linkall.bc
 	file-table-tform -extract=Code -drop_titles -o ./tmp/$<-list.txt ./tmp/$<.table
 	llvm-foreach --in-file-list=./tmp/$<-list.txt --in-replace=./tmp/$<-list.txt --out-ext=spv --out-file-list=./tmp/$<-list1.txt --out-replace=./tmp/$<-list1.txt --out-dir=./tmp --jobs=8 -- llvm-spirv -o ./tmp/$<-list1.txt -spirv-max-version=1.4 -spirv-debug-info-version=ocl-100 -spirv-allow-extra-diexpressions -spirv-allow-unknown-intrinsics=llvm.genx. -spirv-ext=$(spirv_ext) ./tmp/$<-list.txt
-	llvm-foreach --out-ext=out --in-file-list=./tmp/$<-list1.txt --in-replace=./tmp/$<-list1.txt  --out-file-list=./tmp/$<.out --out-replace=./tmp/$<.out --jobs=8 -- ocloc -output ./tmp/$<.out -file ./tmp/$<-list1.txt -output_no_suffix -spirv_input -device pvc
+	llvm-foreach --out-ext=out --in-file-list=./tmp/$<-list1.txt --in-replace=./tmp/$<-list1.txt  --out-file-list=./tmp/$<.out --out-replace=./tmp/$<.out --jobs=8 -- ocloc -output ./tmp/$<.out -file ./tmp/$<-list1.txt -output_no_suffix -spirv_input -device pvc -internal_options -cl-intel-256-GRF-per-thread
 
 test_execs=benchmark_2d_load benchmark_mma dpas
 
