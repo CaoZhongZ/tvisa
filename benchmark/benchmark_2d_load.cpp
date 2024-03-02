@@ -158,7 +158,7 @@ int main(int argc, char *argv[]) {
   auto *b_host = sycl::malloc_host<InT>(alloc_elems, queue);
   auto *b_check = sycl::malloc_host<InT>(alloc_elems, queue);
 
-  release_guard __guard([&] {
+  __scope_guard __guard([&] {
     sycl::free(src, queue);
     sycl::free(dst, queue);
     sycl::free(b_host, queue);

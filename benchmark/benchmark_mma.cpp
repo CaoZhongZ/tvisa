@@ -324,7 +324,7 @@ int main(int argc, char *argv[]) {
       },
       queue, device, context);
 
-  release_guard __guard([&] {
+  __scope_guard __guard([&] {
     sycl::free(A, queue);
     sycl::free(B, queue);
     sycl::free(C, queue);
