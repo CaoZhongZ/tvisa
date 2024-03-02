@@ -12,6 +12,18 @@ struct RawSendLoad {
 };
 
 template <int DataWidth, int DestRegNumber, DataShuffle Transpose, CacheCtrl Cache>
+struct RawSendLoad32x16 {
+  template <typename T, typename AddressPayload>
+  static inline void run(T& target, const AddressPayload(& adrs)[2]);
+};
+
+template <int DataWidth, int DestRegNumber, DataShuffle Transpose, CacheCtrl Cache>
+struct RawSendLoad32x32 {
+  template <typename T, typename AddressPayload>
+  static inline void run(T& target, const AddressPayload& adrs);
+};
+
+template <int DataWidth, int DestRegNumber, DataShuffle Transpose, CacheCtrl Cache>
 struct RawSendStore {
   template <typename T, typename AddressPayload>
   static inline void run(const AddressPayload& adrs, const T& target);
@@ -20,6 +32,20 @@ struct RawSendStore {
 // store a matrix with height = 32 in elem, and width = 32 in bytes
 template <int DataWidth, int DestRegNumber, DataShuffle Transpose, CacheCtrl Cache>
 struct RawSendStore32_32 {
+  template <typename T, typename AddressPayload>
+  static inline void run(const AddressPayload& adrs, const T& target);
+};
+
+// store a matrix with height = 16 in elem, and width = 32 in bytes and array_size = 2
+template <int DataWidth, int DestRegNumber, DataShuffle Transpose, CacheCtrl Cache>
+struct RawSendStore16_64 {
+  template <typename T, typename AddressPayload>
+  static inline void run(const AddressPayload& adrs, const T& target);
+};
+
+// store a matrix with height = 32 in elem, and width = 64 in bytes
+template <int DataWidth, int DestRegNumber, DataShuffle Transpose, CacheCtrl Cache>
+struct RawSendStore32_64 {
   template <typename T, typename AddressPayload>
   static inline void run(const AddressPayload& adrs, const T& target);
 };
@@ -38,6 +64,49 @@ struct RawSendStore32_32 {
   };
 
 #include "list_raw_loads.list"
+
+#define EnumerateLoad32x16(DataWidth, DataShuffle, CacheCtrl, DescStr) \
+  template <> \
+  struct RawSendLoad32x16<DataWidth, 16, DataShuffle, CacheCtrl> {  \
+    template <typename T, typename AddressPayload> \
+    static inline void run(T& target, const AddressPayload(& address)[2]) { \
+      asm volatile ("\n"  \
+          "raw_sends.15.1.0.8 (M1, 1) 0x0:ud " str(DescStr) ":ud %1.0 V0.0 %0.0\n"  \
+          "raw_sends.15.1.0.8 (M1, 1) 0x0:ud " str(DescStr) ":ud %2.0 V0.0 %0.512\n"  \
+        : "=rw"(target) : "rw"(address[0].getPayload()), "rw"(address[1].getPayload()));  \
+    } \
+  }; 
+
+EnumerateLoad32x16(1, DataShuffle::none, CacheCtrl::DEFAULT, 0x2800203);
+EnumerateLoad32x16(1, DataShuffle::none, CacheCtrl::L1UC_L3UC, 0x2820203);
+EnumerateLoad32x16(1, DataShuffle::none, CacheCtrl::L1UC_L3C, 0x2840203);
+EnumerateLoad32x16(1, DataShuffle::none, CacheCtrl::L1C_L3UC, 0x2860203);
+EnumerateLoad32x16(1, DataShuffle::none, CacheCtrl::L1C_L3C, 0x2880203);
+EnumerateLoad32x16(1, DataShuffle::none, CacheCtrl::L1S_L3UC, 0x28a0203);
+EnumerateLoad32x16(1, DataShuffle::none, CacheCtrl::L1S_L3C, 0x28c0203);
+EnumerateLoad32x16(1, DataShuffle::none, CacheCtrl::L1IAR_L3C, 0x28e0203);
+
+
+#define EnumerateLoad32x32(DataWidth, DataShuffle, CacheCtrl, DescStr) \
+  template <> \
+  struct RawSendLoad32x32<DataWidth, 32, DataShuffle, CacheCtrl> {  \
+    template <typename T, typename AddressPayload> \
+    static inline void run(T& target, const AddressPayload& address) { \
+      asm volatile ("\n"  \
+          "raw_sends.15.1.0.16 (M1, 1) 0x0:ud " str(DescStr) ":ud %1.0 V0.0 %0.0\n"  \
+          "add (M1, 1) %1(0, 6)<1> %1(0, 6)<0;1,0> %2\n"\
+          "raw_sends.15.1.0.16 (M1, 1) 0x0:ud " str(DescStr) ":ud %1.0 V0.0 %0.1024\n"  \
+        : "=rw"(target) : "rw"(address.getPayload()), "i"(16));  \
+    } \
+  }; 
+EnumerateLoad32x32(1, DataShuffle::none, CacheCtrl::DEFAULT, 0x3000203);
+EnumerateLoad32x32(1, DataShuffle::none, CacheCtrl::L1UC_L3UC, 0x3020203);
+EnumerateLoad32x32(1, DataShuffle::none, CacheCtrl::L1UC_L3C, 0x3040203);
+EnumerateLoad32x32(1, DataShuffle::none, CacheCtrl::L1C_L3UC, 0x3060203);
+EnumerateLoad32x32(1, DataShuffle::none, CacheCtrl::L1C_L3C, 0x3080203);
+EnumerateLoad32x32(1, DataShuffle::none, CacheCtrl::L1S_L3UC, 0x30a0203);
+EnumerateLoad32x32(1, DataShuffle::none, CacheCtrl::L1S_L3C, 0x30c0203);
+EnumerateLoad32x32(1, DataShuffle::none, CacheCtrl::L1IAR_L3C, 0x30e0203);
 
 #define EnumerateStores(DataWidth, SrcRegNumber, DataShuffle, CacheCtrl, DescStr) \
   template <> \
@@ -63,7 +132,33 @@ struct RawSendStore32_32 {
             "raw_sends.15.1.8.0 (M1, 1) 0x0:ud " str(DescStr) ":ud %0.0 %1.512 V0.0\n" \
             :: "rw"(address.getPayload()), "rw"(target), "i"(16));  \
     }\
-  };
+  }; \
+  template <>\
+  struct RawSendStore32_64<DataWidth, 32, DataShuffle, CacheCtrl> {\
+    template <typename T, typename AddressPayload>\
+    static inline void run(const AddressPayload& address, const T& target){\
+        asm volatile ("\n"  \
+            "raw_sends.15.1.8.0 (M1, 1) 0x0:ud " str(DescStr) ":ud %0.0 %1.0 V0.0\n" \
+            "add (M1, 1) %0(0, 6)<1> %0(0, 6)<0;1,0> %2\n"\
+            "raw_sends.15.1.8.0 (M1, 1) 0x0:ud " str(DescStr) ":ud %0.0 %1.512 V0.0\n" \
+            "add (M1, 1) %0(0, 6)<1> %0(0, 6)<0;1,0> %2\n"\
+            "raw_sends.15.1.8.0 (M1, 1) 0x0:ud " str(DescStr) ":ud %0.0 %1.1024 V0.0\n" \
+            "add (M1, 1) %0(0, 6)<1> %0(0, 6)<0;1,0> %2\n"\
+            "raw_sends.15.1.8.0 (M1, 1) 0x0:ud " str(DescStr) ":ud %0.0 %1.1536 V0.0\n" \
+            :: "rw"(address.getPayload()), "rw"(target), "i"(8));  \
+    }\
+  };\
+  template <>\
+  struct RawSendStore16_64<DataWidth, 16, DataShuffle, CacheCtrl> {\
+    template <typename T, typename AddressPayload>\
+    static inline void run(const AddressPayload& address, const T& target){\
+        asm volatile ("\n"  \
+            "raw_sends.15.1.8.0 (M1, 1) 0x0:ud " str(DescStr) ":ud %0.0 %1.0 V0.0\n" \
+            "add (M1, 1) %0(0, 6)<1> %0(0, 6)<0;1,0> %2\n"\
+            "raw_sends.15.1.8.0 (M1, 1) 0x0:ud " str(DescStr) ":ud %0.0 %1.512 V0.0\n" \
+            :: "rw"(address.getPayload()), "rw"(target), "i"(8));  \
+    }\
+  };  
 
 EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::DEFAULT, 0x2800207);
 EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1UC_L3UC, 0x2820207);

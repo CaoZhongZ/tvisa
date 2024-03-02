@@ -440,7 +440,7 @@ struct __ArrayMatrix {
   __ArrayMatrix(const __ArrayMatrix &rh) : registerImage_(rh.registerImage_) {}
 
   inline __ArrayMatrix& operator = (const __ArrayMatrix& rh) {
-    registerImage_ = std::move(rh.registerImage_);    
+    registerImage_ = rh.registerImage_;    
     return *this;
   }
 

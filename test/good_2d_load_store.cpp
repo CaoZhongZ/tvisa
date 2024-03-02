@@ -43,41 +43,41 @@ template <typename T> void fill_sequential(T *p, int rank, size_t nelems) {
   }
 }
 
-template <int Height, int Width, typename T> struct tile_accumulate {
-  tile_accumulate(T *dst, T *src, int surfaceH, int surfaceW, int surfaceP)
-      : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW),
-        surfaceP(surfaceP) {}
+// template <int Height, int Width, typename T> struct tile_accumulate {
+//   tile_accumulate(T *dst, T *src, int surfaceH, int surfaceW, int surfaceP)
+//       : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW),
+//         surfaceP(surfaceP) {}
 
-  void operator()
-      [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::nd_item<1> item) const {
-    auto index = item.get_global_linear_id();
-#if defined(__SYCL_DEVICE_ONLY__)
-    int x_off = 0;
-    int y_off = index / SG_SZ * Height;
+//   void operator()
+//       [[sycl::reqd_sub_group_size(SG_SZ)]] (sycl::nd_item<1> item) const {
+//     auto index = item.get_global_linear_id();
+// #if defined(__SYCL_DEVICE_ONLY__)
+//     int x_off = 0;
+//     int y_off = index / SG_SZ * Height;
 
-    __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp0;
-    __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp1;
-    AddressPayload<Height, Width> address_payload_0(
-        (void *)src, surfaceH, surfaceW, surfaceP, x_off, y_off);
-    AddressPayload<Height, Width> address_payload_1(
-        (void *)dst, surfaceH, surfaceW, surfaceP, x_off, y_off);
-    lscLoad(tmp0, address_payload_0);
-    lscLoad(tmp1, address_payload_1);
+//     __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp0;
+//     __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp1;
+//     AddressPayload<Height, Width> address_payload_0(
+//         (void *)src, surfaceH, surfaceW, surfaceP, x_off, y_off);
+//     AddressPayload<Height, Width> address_payload_1(
+//         (void *)dst, surfaceH, surfaceW, surfaceP, x_off, y_off);
+//     lscLoad(tmp0, address_payload_0);
+//     lscLoad(tmp1, address_payload_1);
 
-    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> ret = tmp0 + tmp1;
-    lscStore<CacheCtrl::L1WB_L3WB>(address_payload_1, ret);
-#else
-    dst[index] += src[index];
-#endif
-  }
+//     __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> ret = tmp0 + tmp1;
+//     lscStore<CacheCtrl::L1WB_L3WB>(address_payload_1, ret);
+// #else
+//     dst[index] += src[index];
+// #endif
+//   }
 
-private:
-  T *src;
-  T *dst;
-  int surfaceH;
-  int surfaceW;
-  int surfaceP;
-};
+// private:
+//   T *src;
+//   T *dst;
+//   int surfaceH;
+//   int surfaceW;
+//   int surfaceP;
+// };
 
 template <int Height, int Width, typename T> struct vnni_test {
   vnni_test(T *dst, T *src, int surfaceH, int surfaceW, int surfaceP)
@@ -90,24 +90,15 @@ template <int Height, int Width, typename T> struct vnni_test {
 #if defined(__SYCL_DEVICE_ONLY__)
     int x_off = 0;
     int y_off = index / SG_SZ * Height;
-
-    __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp0;
-    AddressPayload<Height, Width> address_payload_0(
+    
+    
+    __ArrayMatrix<T, Height, Width/2, DataShuffle::vnni, SG_SZ, 2> tmp0;
+    AddressPayload<Height, Width/2, 2> address_payload_0(
         (void *)src, surfaceH, surfaceW, surfaceP, x_off, y_off);
     lscLoad<CacheCtrl::L1UC_L3UC>(tmp0, address_payload_0);
 
-    __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> ret;
-    sycl::vec<T, __Matrix<T, Height, Width, DataShuffle::none, SG_SZ>::N>
-        image = tmp0.getImage();
-    ret.getImage() = image;
-
-    if (index == 0) {
-      constexpr int N = __Matrix<T, Height, Width, DataShuffle::none, SG_SZ>::N;
-      for (int i = 0; i < N; ++i) {
-        sycl::ext::oneapi::experimental::printf(fmt, float(image[i]));
-      }
-      sycl::ext::oneapi::experimental::printf(fmt_end);
-    }
+    __ArrayMatrix<T, Height, Width, DataShuffle::none, SG_SZ> ret;
+    ret.getStorage() = tmp0.getStorage();
 
     AddressPayload<Height, Width> address_payload_1(
         (void *)dst, surfaceH, surfaceW, surfaceP, x_off, y_off);
@@ -172,9 +163,9 @@ int main(int argc, char *argv[]) {
   queue.fill<InT>(dst, 1, nelems);
 
   int tensorH = surfaceH;
-  constexpr int tensorW = 32; // bytes
+  constexpr int tensorW = 64; // bytes
   constexpr int tensorP = tensorW;
-  constexpr int ROW = 32;
+  constexpr int ROW = 16;
   constexpr int COL = tensorW / sizeof(InT);
   auto block_sz = ROW * COL * sizeof(InT);
   auto blocks = (alloc_size + block_sz - 1) / block_sz;

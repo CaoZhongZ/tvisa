@@ -90,7 +90,7 @@ void verify_result(const T* actual_result, const T* srcA, const T* srcB, int M, 
   
   std::vector<float> expected(M * N, 0);
   
-  // cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, a.data(), K, b.data(), N, 0, expected.data(), N);
+  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, a.data(), K, b.data(), N, 0, expected.data(), N);
   
   bool res = all_close(actual_result, ldc, expected.data(), N, M, N);
   if (res) 
@@ -164,49 +164,32 @@ struct tile_accumulate<T, M, K, N, typename std::enable_if_t<K == 16 && (N > 16)
 
     auto x_off = grp_num * 16;
     auto y_off = 0;
-
+        
     // load a
     AddressPayload<M, 16> srcAAddress(src,
         surfaceW, surfaceH, surfaceP, x_off, y_off);
-    __ArrayMatrix<T, M, 16, DataShuffle::none, 16> tmp0;
+    __ArrayMatrix<T, M, 16, DataShuffle::none, SG_SZ> tmp0;
     lscLoad(tmp0, srcAAddress);
     
     // load b
-    AddressPayload<16, 16> srcBAddress(src,
+    AddressPayload<16, 16, 2> srcBAddress(src,
         surfaceW, surfaceH, surfaceP, x_off, y_off);        
-    __ArrayMatrix<T, 16, 16, DataShuffle::vnni, 16> tmp1[N/16];
-    constexpr int N_Loop = N / 16;
-    #pragma unroll
-    for(int i=0; i<N_Loop; ++i) {
-      srcBAddress.UpdateSrc0AddrX(y_off + i * 16);
-      lscLoad(tmp1[i], srcBAddress);
-    }
+    __ArrayMatrix<T, 16, 16, DataShuffle::vnni, SG_SZ, 2> tmp1;
+    lscLoad(tmp1, srcBAddress);
     
     // MMA
-    __ArrayMatrix<T, M, 16, DataShuffle::none, 16> acc[N/16];    
-
-    #pragma unroll
-    for(int i=0; i<N_Loop; ++i) {
-      acc[i].zero();
-    }
-
-    swFence();
-
-    #pragma unroll
-    for(int i=0; i<N_Loop; ++i) {
-      dpas(acc[i], tmp0, tmp1[i]);            
-    }
-
-    swFence();
+    __ArrayMatrix<T, M, 16, DataShuffle::none, SG_SZ> acc[2];    
+    acc[0].zero();
+    acc[1].zero();
+    
+    dpas<32, 16, 32>(acc, tmp0, tmp1);            
     
     // store c
     AddressPayload<M, 16> dstAddress(srcAAddress);
     dstAddress.updateSurfaceBase(dst);
-    #pragma unroll
-    for(int i=0; i<N_Loop; ++i) {
-      dstAddress.UpdateSrc0AddrX(y_off + i * 16);             
-      lscStore(dstAddress, acc[i]);  
-    }
+    lscStore(dstAddress, acc[0]);  
+    dstAddress.addSrc0AddrX(16);
+    lscStore(dstAddress, acc[1]);      
 #else
     dst[index] += src[index];
 #endif
@@ -278,7 +261,7 @@ int main(int argc, char *argv[]) {
 
   constexpr int M = 32;
   constexpr int K = 16;
-  constexpr int N = 64;
+  constexpr int N = 32;
 
   queue.fill<t_type>(dst, 8., nelems);
 

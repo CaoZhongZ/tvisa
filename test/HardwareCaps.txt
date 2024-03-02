@@ -1,0 +1,25 @@
+// ------------------------------------------------
+// HardwareCaps.txt
+// ------------------------------------------------
+// Hardware Caps :
+EUCount 		= 	0
+ThreadCount 		= 	0
+SliceCount 		= 	0
+SubSliceCount 		= 	0
+TotalPsThreadsWindowerRange 		= 	64
+TotalVsThreads 		= 	336
+TotalVsThreads_Pocs 		= 	0
+TotalGsThreads 		= 	336
+TotalDsThreads 		= 	336
+TotalHsThreads 		= 	336
+MaxEuPerSubSlice 		= 	8
+EuCountPerPoolMax 		= 	0
+EuCountPerPoolMin 		= 	0
+MaxSlicesSupported 		= 	8
+MaxSubSlicesSupported 		= 	64
+ProductFamily 		= 	IGFX_PVC
+PlatformFamily 		= 	IGFX_GEN12_CORE
+UsDeviceID 		= 	0xbd5
+UsRevId 		= 	0x7
+UsDeviceID_PCH 		= 	0x12
+UsRevId_PCH 		= 	0x0

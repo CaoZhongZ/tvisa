@@ -15,6 +15,13 @@ struct MMA32x32x16 {
   static constexpr uint32_t mma_k_in_bytes = 32;
 };
 
+struct MMA32x32x32 {
+  static constexpr uint32_t mma_m_in_elem = 32;
+  static constexpr uint32_t mma_n_in_elem = 32;
+  static constexpr uint32_t mma_k_in_bytes = 32;
+};
+
+
 struct MMA32x32x64 {
   static constexpr uint32_t mma_m_in_elem = 32;
   static constexpr uint32_t mma_n_in_elem = 64;

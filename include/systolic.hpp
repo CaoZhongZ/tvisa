@@ -20,6 +20,58 @@ template <
   typename OT,
   typename AccumT,
   typename IT1,
+  typename IT2 = IT1
+> struct Dpas32x16x32 {
+  static constexpr int M = 32;
+  static constexpr int K = 16;
+  static constexpr int N = 32;
+  static constexpr int SubGroupSize = 16;
+  static inline void run(
+      __ArrayMatrix<OT, M, N/2, DataShuffle::none, SubGroupSize>(& C)[2],   /* dst/src0 */
+      __ArrayMatrix<IT1, M, K, DataShuffle::none, SubGroupSize>& A,  /* src2 */
+      __ArrayMatrix<IT2, K, N/2, DataShuffle::vnni, SubGroupSize, 2>& B   /* src1 */
+  );
+};
+
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
+template <>
+struct Dpas32x16x32<sycl::half, sycl::half, sycl::half, sycl::half> {
+  static constexpr int M = 32;
+  static constexpr int K = 16;
+  static constexpr int N = 32;  
+  static constexpr int SubGroupSize = 16;
+  
+   static inline void run(
+      __ArrayMatrix<sycl::half, M, N/2, DataShuffle::none, SubGroupSize>(& C)[2],  /* dst/src0 */
+      __ArrayMatrix<sycl::half, M, K, DataShuffle::none, SubGroupSize>& A,  /* src2 */
+      __ArrayMatrix<sycl::half, K, N/2, DataShuffle::vnni, SubGroupSize, 2>& B   /* src1 */
+  ) {
+    asm volatile ("{\n"  
+        ".decl aliasC0 v_type=G type=hf num_elts=512 align=GRF alias=<%0,0>\n"     
+        ".decl aliasC1 v_type=G type=hf num_elts=512 align=GRF alias=<%1,0>\n"     
+        ".decl aliasA v_type=G type=d num_elts=256 align=GRF alias=<%2,0>\n" 
+        ".decl aliasB0 v_type=G type=d num_elts=128 align=GRF alias=<%3,0>\n"
+        ".decl aliasB1 v_type=G type=d num_elts=128 align=GRF alias=<%3,512>\n"
+        "dpas.hf.hf.8.8 (M1, 16) aliasC0.0 aliasC0.0 aliasB0.0 aliasA(0, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) aliasC0.256 aliasC0.256 aliasB0.0 aliasA(4, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) aliasC0.512 aliasC0.512 aliasB0.0 aliasA(8, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) aliasC0.768 aliasC0.768 aliasB0.0 aliasA(12, 0)\n" 
+        "dpas.hf.hf.8.8 (M1, 16) aliasC1.0 aliasC1.0 aliasB1.0 aliasA(0, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) aliasC1.256 aliasC1.256 aliasB1.0 aliasA(4, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) aliasC1.512 aliasC1.512 aliasB1.0 aliasA(8, 0)\n"
+        "dpas.hf.hf.8.8 (M1, 16) aliasC1.768 aliasC1.768 aliasB1.0 aliasA(12, 0)\n"                  
+        "}\n" 
+        : "+rw"(C[0].getStorage()), "+rw"(C[1].getStorage()) \
+        : "rw"(A.getStorage()), "rw"(B.getStorage())
+    );      
+  };
+};
+#endif
+
+template <
+  typename OT,
+  typename AccumT,
+  typename IT1,
   typename IT2 = IT1,
   typename config = systolic_config
 > struct Dpas {
@@ -299,7 +351,7 @@ template <
   typename IT2,
   int SubGroupSize,
   typename config = systolic_config>
-static inline void dpas(
+static typename std::enable_if<K == 16 && N == 16, void>::type dpas(
     __ArrayMatrix<OT, M, N, DataShuffle::none, SubGroupSize>& C,
     __ArrayMatrix<IT1, M, K,  DataShuffle::none, SubGroupSize>& A,
     __ArrayMatrix<IT2, K, N, DataShuffle::vnni, SubGroupSize>& B
@@ -307,6 +359,22 @@ static inline void dpas(
   // TODO: check accepted parameters with static assert;
   static_assert(SubGroupSize == 16, "SubGroupSize for dpas must be 16");
   Dpas<OT, OT, IT1, IT2, systolic_config>::template run<M>(C, A, B);
+}
+
+template <
+  int M, int K, int N,
+  typename OT,
+  typename IT1,
+  typename IT2,
+  int SubGroupSize>
+static inline typename std::enable_if<M == 32 && K == 16 && N == 32, void>::type dpas(
+    __ArrayMatrix<OT, M, N/2, DataShuffle::none, SubGroupSize>(& C)[2],
+    __ArrayMatrix<IT1, M, K, DataShuffle::none, SubGroupSize>& A,
+    __ArrayMatrix<IT2, K, N / 2, DataShuffle::vnni, SubGroupSize, 2>& B
+) {
+  // TODO: check accepted parameters with static assert;
+  static_assert(SubGroupSize == 16, "SubGroupSize for dpas must be 16");
+  Dpas32x16x32<OT, OT, IT1, IT2>::run(C, A, B);
 }
 
 }

@@ -29,6 +29,24 @@ template <typename T, int N> struct SetZero;
         "mov (M1, 16) alias_(13, 0)<1> 0:ud\n"         \
         "mov (M1, 16) alias_(14, 0)<1> 0:ud\n"         \
         "mov (M1, 16) alias_(15, 0)<1> 0:ud\n"
+        
+#define _MOV32                                                  \
+  _MOV16 "mov (M1, 16) alias_(16, 0)<1> 0:ud\n"          \
+         "mov (M1, 16) alias_(17, 0)<1> 0:ud\n"          \
+         "mov (M1, 16) alias_(18, 0)<1> 0:ud\n"         \
+         "mov (M1, 16) alias_(19, 0)<1> 0:ud\n"         \
+         "mov (M1, 16) alias_(20, 0)<1> 0:ud\n"         \
+         "mov (M1, 16) alias_(21, 0)<1> 0:ud\n"         \
+         "mov (M1, 16) alias_(22, 0)<1> 0:ud\n"         \
+         "mov (M1, 16) alias_(23, 0)<1> 0:ud\n"         \
+         "mov (M1, 16) alias_(24, 0)<1> 0:ud\n"         \
+         "mov (M1, 16) alias_(25, 0)<1> 0:ud\n"         \
+         "mov (M1, 16) alias_(26, 0)<1> 0:ud\n"         \
+         "mov (M1, 16) alias_(27, 0)<1> 0:ud\n"         \
+         "mov (M1, 16) alias_(28, 0)<1> 0:ud\n"         \
+         "mov (M1, 16) alias_(29, 0)<1> 0:ud\n"         \
+         "mov (M1, 16) alias_(30, 0)<1> 0:ud\n"        \
+         "mov (M1, 16) alias_(31, 0)<1> 0:ud\n"                    
 
 template <typename T> struct SetZero<T, 4> {
   static inline void run(T &target) {
@@ -55,6 +73,16 @@ template <typename T> struct SetZero<T, 16> {
     asm volatile("{\n"
                   ".decl alias_ v_type=G type=ud num_elts=256 align=GRF alias=<%0, 0>\n"
                   _MOV16
+                  "}\n"
+                 : "=rw"(target));
+  }
+};
+
+template <typename T> struct SetZero<T, 32> {
+  static inline void run(T &target) {
+    asm volatile("{\n"
+                  ".decl alias_ v_type=G type=ud num_elts=512 align=GRF alias=<%0, 0>\n"
+                  _MOV32
                   "}\n"
                  : "=rw"(target));
   }
