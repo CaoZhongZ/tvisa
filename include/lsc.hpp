@@ -77,6 +77,7 @@ static inline void lscPrefetch(sycl::vec<T, N> *addr) {
 //
 // lscLoad<CacheCtrl::L1UC_L3UC>(M, address);
 //
+// ----------------TODO: remove these interface----------------------
 template <CacheCtrl CTL= CacheCtrl::DEFAULT,
     typename T, int BlockHeight, int BlockWidth, DataShuffle Transpose, int SubGroupSize=16>
 static inline void lscLoad(
@@ -100,50 +101,83 @@ static inline void lscStore(
   RawSendStore<DataWidth, PhyNumRegs, Transpose, CTL>::run(address, M.getStorage());
 }
 
-template <CacheCtrl CTL= CacheCtrl::DEFAULT,
-    typename T, int BlockHeight, int BlockWidth, DataShuffle Transpose, int SubGroupSize=16>
+// ----------------TODO: END remove ------------------------------
+
+template <
+  CacheCtrl CTL= CacheCtrl::DEFAULT,
+  typename T, int BlockHeight, int BlockWidth,
+  DataShuffle Transpose, int SubGroupSize, int ArrayLength
+>
 static inline void lscLoad(
-    __ArrayMatrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>& M,
-    const AddressPayload<BlockHeight, BlockWidth>& address
+    __ArrayMatrix<
+      T, BlockHeight, BlockWidth, Transpose, SubGroupSize, ArrayLength
+    >& M,
+    const AddressPayload<BlockHeight, BlockWidth, ArrayLength>& address
 ) {
-  constexpr auto PhyNumRegs = __ArrayMatrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>::PhyNumRegs;
-  constexpr auto DataWidth = __ArrayMatrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>::LSCWidth;
+  constexpr auto PhyNumRegs = __ArrayMatrix<
+    T, BlockHeight, BlockWidth, Transpose, SubGroupSize, ArrayLength
+  >::PhyNumRegs;
+  constexpr auto DataWidth = __ArrayMatrix<
+    T, BlockHeight, BlockWidth, Transpose, SubGroupSize, ArrayLength
+  >::LSCWidth;
   RawSendLoad<DataWidth, PhyNumRegs, Transpose, CTL>::run(M.getStorage(), address);
 }
 
-template <CacheCtrl CTL= CacheCtrl::DEFAULT,
-    typename T, int BlockHeight, int BlockWidth, DataShuffle Transpose, int SubGroupSize=16>
+template <
+  CacheCtrl CTL= CacheCtrl::DEFAULT,
+  typename T, int BlockHeight, int BlockWidth,
+  DataShuffle Transpose, int SubGroupSize, int ArrayLength
+>
 static inline void lscPrefetch(
-    const AddressPayload<BlockHeight, BlockWidth>& address
+    const AddressPayload<BlockHeight, BlockWidth, ArrayLength>& address
 ) {
-  constexpr auto DataWidth = __ArrayMatrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>::LSCWidth;
+  constexpr auto DataWidth = __ArrayMatrix<
+    T, BlockHeight, BlockWidth, Transpose, SubGroupSize, ArrayLength
+  >::LSCWidth;
   RawPrefetch<DataWidth, 0, Transpose, CTL>::run(address);
 }
 
-template <CacheCtrl CTL= CacheCtrl::DEFAULT,
-    typename T, int BlockHeight, int BlockWidth, DataShuffle Transpose, int SubGroupSize=16>
+template <
+    CacheCtrl CTL= CacheCtrl::DEFAULT,
+    typename T, int BlockHeight, int BlockWidth,
+    DataShuffle Transpose, int SubGroupSize, int ArrayLength
+>
 static inline typename std::enable_if<BlockHeight <= 16, void>::type lscStore(
-    AddressPayload<BlockHeight, BlockWidth>& address,
-    const __ArrayMatrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>& M
+    AddressPayload<BlockHeight, BlockWidth, ArrayLength>& address,
+    const __ArrayMatrix<
+      T, BlockHeight, BlockWidth, Transpose, SubGroupSize, ArrayLength
+    >& M
 ) {
-  constexpr auto PhyNumRegs = __ArrayMatrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>::PhyNumRegs;
+  constexpr auto PhyNumRegs = __ArrayMatrix<
+    T, BlockHeight, BlockWidth, Transpose, SubGroupSize>::PhyNumRegs;
   constexpr auto DataWidth = Log2<sizeof(T)>();
   static_assert(Transpose == DataShuffle::none, "Store support only none shuffled matrix");
   static_assert(PhyNumRegs <= 8, "Store size must <= 512 bytes");  
+  static_assert(ArrayLength == 1, "Store allows only single Array");
   RawSendStore<DataWidth, PhyNumRegs, Transpose, CTL>::run(address, M.getStorage());
 }
 
 
-//  store more than 512 bytes, will decomposed to multiple 16x32 store, and only support update y_off
+//  store more than 512 bytes, will decomposed to multiple 512-byte store, and only support update y_off
 template <CacheCtrl CTL= CacheCtrl::DEFAULT,
-    typename T, int BlockHeight, int BlockWidth, DataShuffle Transpose, int SubGroupSize=16>
-static inline typename std::enable_if<BlockHeight == 32 && BlockWidth == 16 && sizeof(T) == 2, void>::type lscStore(
-    AddressPayload<BlockHeight, BlockWidth>& address,
-    const __ArrayMatrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>& M
+    typename T, int BlockHeight, int BlockWidth,
+    DataShuffle Transpose, int SubGroupSize, int ArrayLength>
+static inline typename std::enable_if<
+  BlockHeight == 32 && BlockWidth == 16 && sizeof(T) == 2, void
+>::type lscStore(
+    AddressPayload<BlockHeight, BlockWidth, ArrayLength>& address,
+    const __ArrayMatrix<
+      T, BlockHeight, BlockWidth, Transpose, SubGroupSize, ArrayLength
+    >& M
 ) {
   static_assert(Transpose == DataShuffle::none, "Store support only none shuffled matrix");
   static_assert(BlockWidth == 16, "Only support store decomposed to multiple 16x32 bytes");
-  constexpr auto PhyNumRegs = __ArrayMatrix<T, BlockHeight, BlockWidth, Transpose, SubGroupSize>::PhyNumRegs;
+  static_assert(ArrayLength == 1, "Store allows only single Array");
+
+  constexpr auto PhyNumRegs = __ArrayMatrix<
+    T, BlockHeight, BlockWidth, Transpose, SubGroupSize, ArrayLength
+  >::PhyNumRegs;
+
   constexpr auto DataWidth = Log2<sizeof(T)>();
 #if defined(__SYCL_DEVICE_ONLY__)  
   AddressPayload<16, 16> address_for_write(address); 
@@ -151,6 +185,8 @@ static inline typename std::enable_if<BlockHeight == 32 && BlockWidth == 16 && s
 #endif  
 }
 
+
+// TODO: START remove
 template <typename T, int Height, int Width,
          DataShuffle Transpose,
          int SubGroupSize, int ArraySize>
@@ -179,32 +215,37 @@ __Matrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>::store(
   RawSendStore<DataWidth, PhyNumRegs, Transpose, CTL>::run(address, this->getStorage());
   return *this;
 }
+// TODO: End remove
 
-template <typename T, int Height, int Width,
-         DataShuffle Transpose,
-         int SubGroupSize, int ArraySize>
+template <
+  typename T, int Height, int Width,
+  DataShuffle Transpose, int SubGroupSize, int ArraySize
+>
 template <CacheCtrl CTL>
 inline __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>&
 __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>::load(
     const AddressPayload<Height, Width, ArraySize>& address
 ) {
-  constexpr auto PhyNumRegs = __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize>::PhyNumRegs;
+  constexpr auto PhyNumRegs = __ArrayMatrix::PhyNumRegs;
   constexpr auto DataWidth = __ArrayMatrix::LSCWidth;
   RawSendLoad<DataWidth, PhyNumRegs, Transpose, CTL>::run(this->getStorage(), address);
   return *this;
 }
 
-template <typename T, int Height, int Width,
-         DataShuffle Transpose,
-         int SubGroupSize, int ArraySize>
-template <CacheCtrl CTL>
-inline __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>&
-__ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>::store(
+template <
+  typename T, int Height, int Width,
+  DataShuffle Transpose,
+  int SubGroupSize, int ArraySize
+> template <CacheCtrl CTL>
+inline __ArrayMatrix<
+  T, Height, Width, Transpose, SubGroupSize, ArraySize
+>& __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>::store(
     const AddressPayload<Height, Width, ArraySize>& address
 ) {
-  constexpr auto PhyNumRegs = __Matrix<T, Height, Width, Transpose, SubGroupSize>::PhyNumRegs;
+  constexpr auto PhyNumRegs = __ArrayMatrix::PhyNumRegs;
   constexpr auto DataWidth = Log2<sizeof(T)>();
   static_assert(Transpose == DataShuffle::none, "Store support only none shuffled matrix");
+  static_assert(ArrayLength == 1, "Store allows only single Array");
   RawSendStore<DataWidth, PhyNumRegs, Transpose, CTL>::run(address, this->getStorage());
   return *this;
 }

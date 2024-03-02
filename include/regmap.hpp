@@ -213,10 +213,10 @@ struct BarrierPayload;
 
 template <typename T, int Height, int Width,
     DataShuffle Transpose, int SubGroupSize = 16, int ArraySize = 1>
-struct InnerLayout;
+struct RegisterLayout;
 
 template <typename T, int Height, int Width, int SubGroupSize, int ArraySize>
-struct InnerLayout<T, Height, Width, DataShuffle::none, SubGroupSize, ArraySize> {
+struct RegisterLayout<T, Height, Width, DataShuffle::none, SubGroupSize, ArraySize> {
 private:
   static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
   static constexpr int PaddedWidth = 1 << Log2Ceiling<sizeof(T) * Width>();
@@ -234,7 +234,7 @@ public:
 // Transpose is always on the granularity of equal or more than 4-byte
 //
 template <typename T, int Height, int Width, int SubGroupSize, int ArraySize>
-struct InnerLayout<T, Height, Width, DataShuffle::transpose, SubGroupSize, ArraySize> {
+struct RegisterLayout<T, Height, Width, DataShuffle::transpose, SubGroupSize, ArraySize> {
 private:
   static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
   static constexpr int PaddedHeight = LowBound<1 << Log2Ceiling<sizeof(T) * Height>(), 4 >();
@@ -250,7 +250,7 @@ public:
 };
 
 template <typename T, int Height, int Width, int SubGroupSize, int ArraySize>
-struct InnerLayout<T, Height, Width, DataShuffle::vnni, SubGroupSize, ArraySize> {
+struct RegisterLayout<T, Height, Width, DataShuffle::vnni, SubGroupSize, ArraySize> {
 private:
   static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
   static constexpr int PaddedHeight = (Height + NElemsPerLane -1)
@@ -277,7 +277,7 @@ template <typename T, int Height, int Width,
          DataShuffle Transpose = DataShuffle::none,
          int SubGroupSize = 16, int ArraySize = 1>
 struct __Matrix {
-  using layout = InnerLayout<T, Height, Width, Transpose, SubGroupSize, ArraySize>;
+  using layout = RegisterLayout<T, Height, Width, Transpose, SubGroupSize, ArraySize>;
   static constexpr int PhyNumRegs = layout::PhyNumRegs;
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
@@ -410,7 +410,7 @@ template <typename T, int Height, int Width,
          DataShuffle Transpose = DataShuffle::none,
          int SubGroupSize = 16, int ArraySize = 1>
 struct __ArrayMatrix {
-  using layout = InnerLayout<T, Height, Width, Transpose, SubGroupSize, ArraySize>;
+  using layout = RegisterLayout<T, Height, Width, Transpose, SubGroupSize, ArraySize>;
   static constexpr int PhyNumRegs = layout::PhyNumRegs;  
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
@@ -525,7 +525,7 @@ template <typename T, int Height, int Width,
          DataShuffle Transpose = DataShuffle::none,
          int SubGroupSize = 16, int ArraySize = 1>
 struct __RawMatrix {
-  using layout = InnerLayout<T, Height, Width, Transpose, SubGroupSize, ArraySize>;
+  using layout = RegisterLayout<T, Height, Width, Transpose, SubGroupSize, ArraySize>;
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
 
