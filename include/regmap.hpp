@@ -43,7 +43,7 @@ template <int N, int L> constexpr int LowBound() {
 // XXX: AddressPayload is reinterpretable among configurations
 //  1. Surface Pitch is in byte
 //  2. Surface Width is in byte
-//  3. Surface Height is in elements???
+//  3. Surface Height
 //  4. StartX/StartY and Block Width/Height are in elements???
 //
 template <int BlockHeight, int BlockWidth, int ArrayLength = 1>
@@ -418,28 +418,26 @@ struct __ArrayMatrix {
 
   static_assert(NumRegs == sizeof(T) * N/sizeof(uint32_t));
 
-  /* XXX: Generate unecessary copy, WTF???
-  inline typename sycl::vec<T, N>::vector_t& getStorage() {
-    return reinterpret_cast<typename sycl::vec<T, N>::vector_t&>(registerImage_);
-  }
-  inline const typename sycl::vec<T, N>::vector_t& getStorage() const {
-    return reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(registerImage_);
-  }
-  */
-  using storage_type = __attribute__((ext_vector_type(N))) typename StorageScalarType<T>::type ;
-  inline storage_type& getStorage() {
+  using storageType = __attribute__((ext_vector_type(N)))
+    typename StorageScalarType<T>::type;
+
+  inline storageType& getStorage() {
     return registerImage_;
   }
-  inline const storage_type& getStorage() const {
+  inline const storageType& getStorage() const {
     return registerImage_;
   }
 
   __ArrayMatrix() = default;
-  __ArrayMatrix(const storage_type& rh): registerImage_(rh) {}
-  __ArrayMatrix(storage_type&& rh): registerImage_(std::move(rh)) {}
+  __ArrayMatrix(const storageType& rh): registerImage_(rh) {}
+  __ArrayMatrix(storageType&& rh): registerImage_(std::move(rh)) {}
   __ArrayMatrix(const __ArrayMatrix &rh) : registerImage_(rh.registerImage_) {}
 
   inline __ArrayMatrix& operator = (const __ArrayMatrix& rh) {
+    registerImage_ = rh.registerImage_;
+    return *this;
+  }
+  inline __ArrayMatrix& operator = (__ArrayMatrix&& rh) {
     registerImage_ = std::move(rh.registerImage_);    
     return *this;
   }
@@ -462,6 +460,25 @@ struct __ArrayMatrix {
 
   template <CacheCtrl CTL = CacheCtrl::DEFAULT>
   inline __ArrayMatrix& store(const AddressPayload<Height, Width, ArraySize> &address);
+
+  template <int ArrayOff, int newArraySize = 1>
+  inline __ArrayMatrix<
+    T, Height, Width, Transpose, SubGroupSize, newArraySize
+  >& subArrayView() {
+    static_assert(ArrayOff + newArraySize <= ArraySize);
+
+    using newStorageType = typename __ArrayMatrix<
+      T, Height, Width, Transpose, SubGroupSize, newArraySize
+    >::storageType;
+
+    auto& splitImage = reinterpret_cast<
+      newStorageType (&)[sizeof(storageType)/sizeof(newStorageType)]
+    >(registerImage_);
+
+    return reinterpret_cast<
+      __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, newArraySize>&
+    >(splitImage[ArrayOff]);
+  }
 
   // Review as re-shuffled tensor in logic view, need careful review here.
   template <DataShuffle reshuffle>
@@ -496,15 +513,11 @@ struct __ArrayMatrix {
     return {registerImage_};
   }
 
-  //
-  // Note: due to performance problem for SIMD16/sycl::half that compiler generate
-  // two instructions for single register operation, we use inline asm here
-  //
   inline void zero(){
-    SetZero<storage_type, NumRegs>::run(registerImage_);
+    memset(registerImage_, 0, sizeof(registerImage_));
   }
 private:
-  storage_type registerImage_;
+  storageType registerImage_;
 };
 
 // __RawMatrix for workaround IGC dpas type requirement if alias doesn't work

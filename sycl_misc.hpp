@@ -40,14 +40,6 @@ sycl::device currentSubDevice(int ndev, int nsub);
 sycl::device currentSubDevice();
 sycl::queue currentQueue();
 
-template <typename F>
-class release_guard {
-  F f;
-public:
-  release_guard(F f) : f(f) {}
-  ~release_guard() { f(); }
-};
-
 // Copy from sycl runtime, change the interface a little bit
 template <typename T, typename Group, typename... Args>
 std::enable_if_t<std::is_trivially_destructible<T>::value &&
