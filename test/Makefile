@@ -1,6 +1,6 @@
 CC=clang
 CXX=clang++
-OPT_FLAGS=-O3 -ffast-math
+OPT_FLAGS=-g -O3 -ffast-math
 
 ENABLE_AOT=pvc
 
@@ -96,6 +96,9 @@ benchmark_mma : benchmark_mma.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
 unit_dpas_addresspayloads : unit_dpas_addresspayloads.o ../sycl_misc.o
+	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
+
+unit_test : unit_test.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
 all : $(test_execs)

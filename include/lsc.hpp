@@ -245,7 +245,7 @@ inline __ArrayMatrix<
   constexpr auto PhyNumRegs = __ArrayMatrix::PhyNumRegs;
   constexpr auto DataWidth = Log2<sizeof(T)>();
   static_assert(Transpose == DataShuffle::none, "Store support only none shuffled matrix");
-  static_assert(ArrayLength == 1, "Store allows only single Array");
+  static_assert(ArraySize == 1, "Store allows only single Array");
   RawSendStore<DataWidth, PhyNumRegs, Transpose, CTL>::run(address, this->getStorage());
   return *this;
 }

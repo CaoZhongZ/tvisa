@@ -37,8 +37,8 @@ struct tileSplitAdd {
 
     tmp.load(adrs);
 
-    auto tmp_0 = tmp.template subArrayView<0>();
-    auto tmp_1 = tmp.template subArrayView<1>();
+    auto& tmp_0 = tmp.template subArrayView<0>();
+    auto& tmp_1 = tmp.template subArrayView<1>();
 
     tmp_0 = tmp_0 + tmp_1;
     tmp_1 = tmp_0;
@@ -85,7 +85,7 @@ struct tileCastAdd {
 
     tmp.load(adrs);
 
-    auto tmp_0 = tmp.template viewAs<CastT>();
+    auto& tmp_0 = tmp.template viewAs<CastT>();
 
     tmp_0 = tmp_0 * tmp_0;
     tmp_0.store(adrs_0);

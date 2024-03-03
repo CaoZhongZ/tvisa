@@ -483,7 +483,7 @@ struct __ArrayMatrix {
     constexpr int NewWidth = sizeof(NewT) < sizeof(T) ?
       Width * sizeof(T)/sizeof(NewT) : Width;
     constexpr int NewHeight = sizeof(NewT) < sizeof(T) ?
-      Height : Height * sizeof(NewT) / sizeof(T);
+      Height : Height * sizeof(T) / sizeof(NewT);
 
     using NewType =__ArrayMatrix<
       NewT, NewHeight, NewWidth, Transpose, SubGroupSize, ArraySize
