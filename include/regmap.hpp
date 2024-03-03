@@ -489,6 +489,9 @@ struct __ArrayMatrix {
       NewT, NewHeight, NewWidth, Transpose, SubGroupSize, ArraySize
     >;
 
+    static_assert(sizeof(NewType) == sizeof(*this),
+        "View size is different from original!");
+
     return reinterpret_cast<NewType &>(*this);
   }
 
