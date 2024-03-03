@@ -108,6 +108,28 @@ int main(int argc, char *argv[]) {
         )
       );
   });
+
   queue.memcpy(b_check, dst, alloc_size);
   queue.wait();
+
+  queue.submit([&](sycl::handler &h) {
+      h.parallel_for(
+        sycl::nd_range<2> (sycl::range<2>(1, SG_SZ), sycl::range<2>(1, SG_SZ)),
+        tileCastAdd<uint32_t, t_type, Height, Width, SG_SZ>(
+          (uint32_t *)dst, (uint32_t *)src, surfaceH, surfaceW, surfaceP
+        )
+      );
+  });
+
+  queue.memcpy(b_check, dst, alloc_size);
+  queue.wait();
+
+  queue.submit([&](sycl::handler &h) {
+      h.parallel_for(
+        sycl::nd_range<2> (sycl::range<2>(1, SG_SZ), sycl::range<2>(1, SG_SZ)),
+        tileCastAdd<t_type, float, Height, Width, SG_SZ>(
+          (t_type *)dst, (t_type *)src, surfaceH, surfaceW, surfaceP
+        )
+      );
+  });
 }

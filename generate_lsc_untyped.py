@@ -99,7 +99,7 @@ def generate_rawsends(file_name, op):
         shuffles = DataShuffle
         cachectrl = CacheCtrlNoLoad
     elif op == 7:
-        des_lens = range(1, 9)
+        des_lens = range(1, 17)
         func_name = 'EnumerateStores'
         shuffles = StoreShuffle
         cachectrl = CacheCtrlNoStore

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "lsc.hpp"
 #define xstr(s) str(s)
 #define str(x) #x
 

@@ -462,9 +462,7 @@ struct __ArrayMatrix {
   inline __ArrayMatrix& store(const AddressPayload<Height, Width, ArraySize> &address);
 
   template <int ArrayOff, int newArraySize = 1>
-  inline __ArrayMatrix<
-    T, Height, Width, Transpose, SubGroupSize, newArraySize
-  >& subArrayView() {
+  inline auto& subArrayView() {
     static_assert(ArrayOff + newArraySize <= ArraySize);
 
     using newStorageType = typename __ArrayMatrix<
@@ -478,6 +476,20 @@ struct __ArrayMatrix {
     return reinterpret_cast<
       __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, newArraySize>&
     >(splitImage[ArrayOff]);
+  }
+
+  template <typename NewT>
+  inline auto& viewAs() {
+    constexpr int NewWidth = sizeof(NewT) < sizeof(T) ?
+      Width * sizeof(T)/sizeof(NewT) : Width;
+    constexpr int NewHeight = sizeof(NewT) < sizeof(T) ?
+      Height : Height * sizeof(NewT) / sizeof(T);
+
+    using NewType =__ArrayMatrix<
+      NewT, NewHeight, NewWidth, Transpose, SubGroupSize, ArraySize
+    >;
+
+    return reinterpret_cast<NewType &>(*this);
   }
 
   // Review as re-shuffled tensor in logic view, need careful review here.
