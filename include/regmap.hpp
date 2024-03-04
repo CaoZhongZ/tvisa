@@ -217,7 +217,7 @@ struct RegisterLayout;
 
 template <typename T, int Height, int Width, int SubGroupSize, int ArraySize>
 struct RegisterLayout<T, Height, Width, DataShuffle::none, SubGroupSize, ArraySize> {
-private:
+protected:
   static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
   static constexpr int PaddedWidth = 1 << Log2Ceiling<sizeof(T) * Width>();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
@@ -235,7 +235,7 @@ public:
 //
 template <typename T, int Height, int Width, int SubGroupSize, int ArraySize>
 struct RegisterLayout<T, Height, Width, DataShuffle::transpose, SubGroupSize, ArraySize> {
-private:
+protected:
   static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
   static constexpr int PaddedHeight = LowBound<1 << Log2Ceiling<sizeof(T) * Height>(), 4 >();
   static constexpr int RegSize = SubGroupSize * sizeof(int);
@@ -251,7 +251,7 @@ public:
 
 template <typename T, int Height, int Width, int SubGroupSize, int ArraySize>
 struct RegisterLayout<T, Height, Width, DataShuffle::vnni, SubGroupSize, ArraySize> {
-private:
+protected:
   static constexpr int NElemsPerLane = sizeof(int) / sizeof(T);
   static constexpr int PaddedHeight = (Height + NElemsPerLane -1)
                                       / NElemsPerLane * NElemsPerLane;
@@ -476,6 +476,22 @@ struct __ArrayMatrix {
     return reinterpret_cast<
       __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, newArraySize>&
     >(splitImage[ArrayOff]);
+  }
+
+  // Becareful, view can only start on register boundary
+  template <int RowStart, int RowHeight>
+  inline auto& subTileView() {
+    static_assert(RowStart + RowHeight <= Height, "View out of bound.");
+    static_assert(ArraySize == 1,
+        "Can't view subtiles when arraysize is larger than 1.");
+
+    using newLayout = RegisterLayout<
+      T, RowStart, Width, DataShuffle::none, SubGroupSize, ArraySize
+    >;
+
+    return reinterpret_cast<
+      __ArrayMatrix<T, RowHeight, Width, Transpose, SubGroupSize, ArraySize>&
+    >(registerImage_[newLayout::N]);
   }
 
   template <typename NewT>

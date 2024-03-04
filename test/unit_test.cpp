@@ -132,4 +132,17 @@ int main(int argc, char *argv[]) {
         )
       );
   });
+  queue.memcpy(b_check, dst, alloc_size);
+  queue.wait();
+
+  queue.submit([&](sycl::handler &h) {
+      h.parallel_for(
+        sycl::nd_range<2> (sycl::range<2>(1, SG_SZ), sycl::range<2>(1, SG_SZ)),
+        tileHSplitAdd<t_type, Height, Width, SG_SZ>(
+          (t_type *)dst, (t_type *)src, surfaceH, surfaceW, surfaceP
+        )
+      );
+  });
+  queue.memcpy(b_check, dst, alloc_size);
+  queue.wait();
 }
