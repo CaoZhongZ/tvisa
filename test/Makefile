@@ -84,7 +84,7 @@ spirv_ext=-all,+SPV_EXT_shader_atomic_float_add,+SPV_EXT_shader_atomic_float_min
 test_execs=good_2d_load_store lsc_uncache_32_and_16 test_2dblock_matrix \
 					 unit_dpas_addresspayloads barrier_test lsc_2d_1024_load_store test_2d_accum_visa \
 					 test_packRegPayload broken_2d_load_store lsc_64to32x2_notrans test_2dblock_fp16 \
-					 test_packRegPayloadClass
+					 test_packRegPayloadClass unit_test
 
 good_2d_load_store : good_2d_load_store.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
