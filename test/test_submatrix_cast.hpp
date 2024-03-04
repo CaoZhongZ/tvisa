@@ -130,7 +130,7 @@ struct tileHSplitAdd {
     tmp.load(adrs);
 
     auto& tmp_0 = tmp.template subTileView<0, BH>();
-    auto& tmp_1 = tmp.template subTileView<1, BH>();
+    auto& tmp_1 = tmp.template subTileView<BH, BH>();
 
     tmp_0 = tmp_0 + tmp_1;
     tmp_1 = tmp_0;

@@ -485,13 +485,17 @@ struct __ArrayMatrix {
     static_assert(ArraySize == 1,
         "Can't view subtiles when arraysize is larger than 1.");
 
-    using newLayout = RegisterLayout<
-      T, RowStart, Width, DataShuffle::none, SubGroupSize, ArraySize
-    >;
+    using newStorageType = typename StorageScalarType<T>::type;
+    constexpr auto Offset = RowStart == 0 ? 0 : RegisterLayout<
+      T, RowStart, Width, Transpose, SubGroupSize, ArraySize
+    >::N;
 
-    return reinterpret_cast<
-      __ArrayMatrix<T, RowHeight, Width, Transpose, SubGroupSize, ArraySize>&
-    >(registerImage_[newLayout::N]);
+    return
+      reinterpret_cast<
+        __ArrayMatrix<T, RowHeight, Width, Transpose, SubGroupSize, ArraySize>&
+      >(
+        reinterpret_cast<newStorageType (&)[N]>(registerImage_)[Offset]
+      );
   }
 
   template <typename NewT>
