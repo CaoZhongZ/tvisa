@@ -44,13 +44,13 @@ template <int N, int L> constexpr int LowBound() {
 //  1. Surface Pitch is in byte
 //  2. Surface Width is in byte
 //  3. Surface Height
-//  4. StartX/StartY and Block Width/Height are in elements???
+//  4. StartX/StartY and Block Width/Height are in elements.
 //
 template <int BlockHeight, int BlockWidth, int ArrayLength = 1>
 struct AddressPayload {
   inline AddressPayload() = default;
   inline AddressPayload(
-    void* SurfaceBase,
+    const void* const SurfaceBase,
     uint32_t SurfaceHeight, uint32_t SurfaceWidth,
     uint32_t SurfacePitch, int Src0AddrX, int Src0AddrY
   ) {
@@ -173,6 +173,9 @@ struct AddressPayload {
     );
     return *this;
   }
+
+  template <typename T, int SubGroupSize = 16, CacheCtrl CTL = CacheCtrl::DEFAULT>
+  inline void prefetch() const;
 
 private:
   uint32_t payloadReg_;
@@ -465,6 +468,22 @@ struct __ArrayMatrix {
   inline auto& subArrayView() {
     static_assert(ArrayOff + newArraySize <= ArraySize);
 
+    using newStorageType = typename __ArrayMatrix<
+      T, Height, Width, Transpose, SubGroupSize, newArraySize
+    >::storageType;
+
+    auto& splitImage = reinterpret_cast<
+      newStorageType (&)[sizeof(storageType)/sizeof(newStorageType)]
+    >(registerImage_);
+
+    return reinterpret_cast<
+      __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, newArraySize>&
+    >(splitImage[ArrayOff]);
+  }
+
+  // Another form???
+  template <int newArraySize = 1>
+  inline auto& subArrayView(int ArrayOff) {
     using newStorageType = typename __ArrayMatrix<
       T, Height, Width, Transpose, SubGroupSize, newArraySize
     >::storageType;

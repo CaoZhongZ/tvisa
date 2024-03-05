@@ -19,110 +19,61 @@ constexpr const int k_unroll = 0;
 
 constexpr const int prefetch_stage = 3;
 
-template <typename result_type>
-inline result_type generate_random(result_type a = -0.5, result_type b = 0.5) {
-  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-  std::default_random_engine engine(seed);
-  std::uniform_real_distribution<result_type> distribution(a, b);
+// Large regsiter file dictate 32 sub-group per SS
+template <typename T, int SubGroupSize = 16> struct groupGemmKernel {
+  groupGemmKernel(
+      const T *A, uint32_t lda,
+      const T *B, uint32_t ldb,
+      T *C,  uint32_t ldc,
+      uint32_t M, uint32_t K, uint32_t N
+  ) : A(A), B(B), C(C), lda(lda), ldb(ldb), ldc(ldc), M(M), K(K), N(N) {}
 
-  return distribution(engine);
-  // return 1;
-}
+  static inline rawSampleSubGroupGemm(int mGroupStart, int nGroupStart) const {
+    auto pos = sycl::ext::oneapi::experimental::this_nd_item<3>();
+    int subGroupM = pos.get_local_id()[0];
+    int subGroupN = pos.get_local_id()[1];
 
-#define random_float() (generate_random<double>())
+    int subMOff = mGroupStart + subGroupM * 32 * sizeof(T);
+    int subNOff = nGroupStart + subGroupN * 64 * sizeof(T);
 
-template <typename data_type>
-inline data_type *alloc_shared_and_init(
-    size_t size,
-    std::function<void(data_type *data, size_t elements)> init_func,
-    sycl::queue &queue, sycl::device &device, sycl::context &context) {
-  auto device_ptr = static_cast<data_type *>(
-      aligned_alloc_shared(4096, size * sizeof(data_type), device, context));
+    constexpr int strideVSize = 16 * sizeof(T);
+    constexpr int strideHSize = 16 * 2 * sizeof(T);
+    constexpr int strideDElems = 16;
 
-  for (size_t i = 0; i < size; ++i) {
-    init_func(device_ptr, i);
-  }
+    AddressPayload<16, 16> addressA_0(A, M, K, lda, 0, subMOff);
+    AddressPayload<16, 16> addressA_1(addressA_0).addSrc0AddrY(strideVSize);
+    AddressPayload<16, 16, 2> addressB_0(B, K, N, ldb, subNOff, 0);
+    AddressPayload<16, 16, 2> addressB_1(B_0).addSrc0AddrX(strideHSize);
 
-  return device_ptr;
-}
+    using mTA = __ArrayMatrix<T, 16, 16, DataShuffle::none, SubGroupSize>;
+    using mTB = __ArrayMatrix<T, 16, 16, DataShuffle::vnni, SubGroupSize, 2>;
+    using mTC = __ArrayMatrix<T, 16, 16, DataShuffle::none, SubGroupSize>;
 
-template <typename T1, typename T2>
-bool all_close(const T1 *actual, int lda, const T2 *desired, int ldb,
-               const int M, const int N, const float rtol = 1e-3,
-               const float atol = 1e-3) {
-  std::pair<int, int> maximum_idx;
-  float maximum_err = 0.f;
-  float tol = 0.f;
-  for (int m = 0; m < M; ++m) {
-    for (int n = 0; n < N; ++n) {
-      const float a = static_cast<float>(actual[m * lda + n]);
-      const float b = static_cast<float>(desired[m * ldb + n]);
-      // std::cout << "actual = " << a << ", desired = " << b << std::endl;
-      const float err = std::fabs(a - b);
-      if (err > maximum_err) {
-        maximum_idx = {m, n};
-        maximum_err = err;
-        tol = atol + rtol * std::fabs(b);
-      }
+    // Systolic march
+    mTA A_0, A_1;
+    mTB B_0, B_1;
+    mTC C_00, C_01, C_10, C_11;
+
+    for (int k = 0; k < K; k += strideDElems) {
     }
-  }
-  if (maximum_err > tol) {
-    const int m = maximum_idx.first;
-    const int n = maximum_idx.second;
-    printf("Error! Matrix[%d, %d]=%.8f, ref=%.8f, error = %.8f, error term is "
-           "> %E\n",
-           m, n, float(actual[m * lda + n]), float(desired[m * ldb + n]),
-           maximum_err, tol);
-    fflush(stdout);
-    return false;
-  }
-  return true;
-}
 
-template <typename T>
-void verify_result(const T *actual_result, const T *srcA, const T *srcB, int M,
-                   int K, int N, int lda, int ldb, int ldc) {
-  std::vector<float> a(M * K), b(K * N);
-  for (int i = 0; i < M; ++i) {
-    for (int j = 0; j < K; ++j) {
-      a[i * K + j] = static_cast<float>(srcA[i * lda + j]);
-    }
-  }
-  for (int i = 0; i < K; ++i) {
-    for (int j = 0; j < N; ++j) {
-      b[i * N + j] = static_cast<float>(srcB[i * ldb + j]);
-    }
+    AddressPayload<8, 16> addressC(C, M, N, ldc, subMOff, subNOff);
   }
 
-  std::vector<float> expected(M * N, 0);
+  static inline groupGemm() const {
+    auto pos = sycl::ext::oneapi::experimental::this_nd_item<3>();
 
-  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f,
-              a.data(), K, b.data(), N, 0, expected.data(), N);
+    auto subGroupM = pos.get_local_id()[0];
+    auto subGroupN = pos.get_local_id()[1];
 
-  bool res = all_close(actual_result, ldc, expected.data(), N, M, N);
-  if (res)
-    printf("test passed\n");
-  else
-    printf("test failed\n");
-}
+    auto groupM = pos.get_group().get_group_id()[0];
+    auto groupN = pos.get_group().get_gropu_id()[1];
 
-float get_gpu_time_from_event(sycl::event &gpu_event) {
-  auto gpu_start =
-      gpu_event
-          .get_profiling_info<sycl::info::event_profiling::command_start>();
-  auto gpu_end =
-      gpu_event.get_profiling_info<sycl::info::event_profiling::command_end>();
-  float gpu_time = (gpu_end - gpu_start);
-  return gpu_time; // ns
-}
+  }
 
-template <typename T> struct MMAKernelImpl {
-  MMAKernelImpl(const T *A, const T *B, T *C, const int matrix_m,
-                const int matrix_k, const int matrix_n)
-      : A(A), B(B), C(C), matrix_m(matrix_m), matrix_k(matrix_k),
-        matrix_n(matrix_n) {}
-  [[sycl::reqd_sub_group_size(sg_size)]] void
-  operator()(sycl::nd_item<3> item) const {
+  void operator()[[sycl::reqd_sub_group_size(SubGroupSize)]] (
+      sycl::nd_item<3> item
+  ) const {
 #if defined(__SYCL_DEVICE_ONLY__)
     auto sg_id_m = item.get_local_id(0);
     auto sg_id_n = item.get_local_id(1);
@@ -227,9 +178,10 @@ template <typename T> struct MMAKernelImpl {
   const T *A;
   const T *B;
   T *C;
-  const int matrix_m;
-  const int matrix_k;
-  const int matrix_n;
+
+  // 2D load basically can only address inside of 24-bit
+  uint32_t lda, ldb, ldc;
+  uint32_t M, K, N;
 };
 
 template <typename T>
@@ -303,7 +255,7 @@ int main(int argc, char *argv[]) {
       },
       queue, device, context);
 
-  release_guard __guard([&] {
+  scope_guard __guard([&] {
     sycl::free(A, queue);
     sycl::free(B, queue);
     sycl::free(C, queue);

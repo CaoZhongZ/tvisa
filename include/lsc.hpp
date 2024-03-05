@@ -137,6 +137,17 @@ static inline void lscPrefetch(
   RawPrefetch<DataWidth, 0, Transpose, CTL>::run(address);
 }
 
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
+template <int BlockHeight, int BlockWidth, int ArrayLength>
+template <typename T, int SubGroupSize, CacheCtrl CTL>
+inline void AddressPayload<BlockHeight, BlockWidth, ArrayLength>::prefetch() const {
+  constexpr auto LSCWidth = RegisterLayout<
+      T, BlockHeight, BlockWidth, DataShuffle::none, SubGroupSize, ArrayLength
+  >::LSCWidth;
+  RawPrefetch<LSCWidth, 0, DataShuffle::none, CTL>::run(*this);
+}
+#endif
+
 template <
     CacheCtrl CTL= CacheCtrl::DEFAULT,
     typename T, int BlockHeight, int BlockWidth,
