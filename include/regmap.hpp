@@ -44,13 +44,13 @@ template <int N, int L> constexpr int LowBound() {
 //  1. Surface Pitch is in byte
 //  2. Surface Width is in byte
 //  3. Surface Height
-//  4. StartX/StartY and Block Width/Height are in elements???
+//  4. StartX/StartY and Block Width/Height are in elements.
 //
 template <int BlockHeight, int BlockWidth, int ArrayLength = 1>
 struct AddressPayload {
   inline AddressPayload() = default;
   inline AddressPayload(
-    void* SurfaceBase,
+    const void* const SurfaceBase,
     uint32_t SurfaceHeight, uint32_t SurfaceWidth,
     uint32_t SurfacePitch, int Src0AddrX, int Src0AddrY
   ) {
@@ -173,6 +173,9 @@ struct AddressPayload {
     );
     return *this;
   }
+
+  template <typename T, int SubGroupSize = 16, CacheCtrl CTL = CacheCtrl::DEFAULT>
+  inline void prefetch() const;
 
 private:
   uint32_t payloadReg_;
@@ -398,12 +401,20 @@ private:
 
 template <typename T> 
 struct StorageScalarType{
-    using type = T;
+  typedef T type;
 };
 
 template <> 
 struct StorageScalarType<sycl::half>{
-    using type = _Float16;
+  typedef _Float16 type;
+};
+
+template <DataShuffle Tranpose> struct rawMatrixScalarType;
+template <> struct rawMatrixScalarType<DataShuffle::none> {
+  typedef short type;
+};
+template <> struct rawMatrixScalarType<DataShuffle::vnni> {
+  typedef int type;
 };
 
 template <typename T, int Height, int Width,
@@ -418,8 +429,8 @@ struct __ArrayMatrix {
 
   static_assert(NumRegs == sizeof(T) * N/sizeof(uint32_t));
 
-  using storageType = __attribute__((ext_vector_type(N)))
-    typename StorageScalarType<T>::type;
+  using scalarType = typename StorageScalarType<T>::type;
+  using storageType = __attribute__((ext_vector_type(N))) scalarType;
 
   inline storageType& getStorage() {
     return registerImage_;
@@ -478,6 +489,22 @@ struct __ArrayMatrix {
     >(splitImage[ArrayOff]);
   }
 
+  // Another form???
+  template <int newArraySize = 1>
+  inline auto& subArrayView(int ArrayOff) {
+    using newStorageType = typename __ArrayMatrix<
+      T, Height, Width, Transpose, SubGroupSize, newArraySize
+    >::storageType;
+
+    auto& splitImage = reinterpret_cast<
+      newStorageType (&)[sizeof(storageType)/sizeof(newStorageType)]
+    >(registerImage_);
+
+    return reinterpret_cast<
+      __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, newArraySize>&
+    >(splitImage[ArrayOff]);
+  }
+
   // Becareful, view can only start on register boundary
   template <int RowStart, int RowHeight>
   inline auto& subTileView() {
@@ -485,17 +512,27 @@ struct __ArrayMatrix {
     static_assert(ArraySize == 1,
         "Can't view subtiles when arraysize is larger than 1.");
 
-    using newStorageType = typename StorageScalarType<T>::type;
+    using __newMatrixType = __ArrayMatrix<T, RowHeight, Width, Transpose, SubGroupSize, ArraySize>;
+    using newStorageType = typename __newMatrixType::storageType;
+    constexpr auto ChunkSize = __newMatrixType::N;
+
+    static_assert(N % ChunkSize == 0, "Unevenly divided view to subtile was not supported");
+
     constexpr auto Offset = RowStart == 0 ? 0 : RegisterLayout<
       T, RowStart, Width, Transpose, SubGroupSize, ArraySize
     >::N;
 
+    static_assert(Offset % ChunkSize == 0, "Unaligned subtile offset was not supported");
+    constexpr auto ChunkOff = Offset / ChunkSize;
+
+    auto& splitImage = reinterpret_cast<
+      newStorageType (&)[sizeof(storageType) / sizeof(newStorageType)]
+    >(registerImage_);
+
     return
       reinterpret_cast<
         __ArrayMatrix<T, RowHeight, Width, Transpose, SubGroupSize, ArraySize>&
-      >(
-        reinterpret_cast<newStorageType (&)[N]>(registerImage_)[Offset]
-      );
+      >(splitImage[ChunkOff]);
   }
 
   template <typename NewT>
@@ -555,37 +592,34 @@ private:
   storageType registerImage_;
 };
 
-// __RawMatrix for workaround IGC dpas type requirement if alias doesn't work
+//
+// __RawMatrix for workaround IGC dpas type
+//
 template <typename T, int Height, int Width,
          DataShuffle Transpose = DataShuffle::none,
          int SubGroupSize = 16, int ArraySize = 1>
 struct __RawMatrix {
   using layout = RegisterLayout<T, Height, Width, Transpose, SubGroupSize, ArraySize>;
+  static constexpr int PhyNumRegs = layout::PhyNumRegs;
   static constexpr int NumRegs = layout::NumRegs;
   static constexpr int N = layout::N;
+  static constexpr int LSCWidth = layout::LSCWidth;
 
-  static_assert(NumRegs == sizeof(sycl::vec<T, N>)/sizeof(uint32_t));
-  using rawType = sycl::vec<uint32_t, sizeof(sycl::vec<T, N>)/sizeof(uint32_t)>;
+  using scalarType = typename rawMatrixScalarType<Transpose>::type;
+  static constexpr int r_N = N * sizeof(T)/sizeof(scalarType);
+  static_assert(r_N > 0, "In RawMatrix, Something went wrong");
+  using storageType = scalarType __attribute__((ext_vector_type(r_N)));
 
-  /* XXX: Generate unecessary copy, WTF???
-  inline typename sycl::vec<T, N>::vector_t& getStorage() {
-    return reinterpret_cast<typename sycl::vec<T, N>::vector_t&>(registerImage_);
+  inline storageType& getStorage() {
+    return registerImage_;
   }
-  inline const typename sycl::vec<T, N>::vector_t& getStorage() const {
-    return reinterpret_cast<const typename sycl::vec<T, N>::vector_t&>(registerImage_);
-  }
-  */
-
-  inline typename rawType::vector_t& getStorage() {
-    return reinterpret_cast<typename rawType::vector_t&>(registerImage_);
-  }
-  inline const typename rawType::vector_t& getStorage() const {
-    return reinterpret_cast<const typename rawType::vector_t&>(registerImage_);
+  inline const storageType& getStorage() const {
+    return registerImage_;
   }
 
   __RawMatrix() = default;
-  __RawMatrix(const sycl::vec<T, N>& rh) : registerImage_(rh) {}
-  __RawMatrix(sycl::vec<T, N>&& rh) : registerImage_(std::move(rh)) {}
+  __RawMatrix(storageType& rh) : registerImage_(rh) {}
+  __RawMatrix(storageType&& rh) : registerImage_(std::move(rh)) {}
   __RawMatrix(const __RawMatrix &rh) : registerImage_(rh.registerImage_) {}
   __RawMatrix(__RawMatrix&& rh) : registerImage_(std::move(rh.registerImage_)) {}
 
@@ -597,17 +631,48 @@ struct __RawMatrix {
     registerImage_ = rh.registerImage_;
     return *this;
   }
-  inline __RawMatrix operator + (const __RawMatrix& m) {
-    return { registerImage_ + m.registerImage_ };
+
+  template <int ArrayOff, int newArraySize = 1>
+  inline auto& subArrayView() {
+    static_assert(ArrayOff + newArraySize <= ArraySize);
+
+    using __newMatrixType = __RawMatrix<
+      T, Height, Width, Transpose, SubGroupSize, newArraySize
+    >;
+    using newStorageType = typename __newMatrixType::storageType;
+
+    auto& splitImage = reinterpret_cast<
+      newStorageType (&)[sizeof(storageType)/sizeof(newStorageType)]
+    >(registerImage_);
+
+    return reinterpret_cast<__newMatrixType&>(splitImage[ArrayOff]);
   }
-  inline __RawMatrix operator - (const __RawMatrix& m) {
-    return { registerImage_ - m.registerImage_ };
-  }
-  inline __RawMatrix operator * (const __RawMatrix& m) {
-    return { registerImage_ * m.registerImage_ };
-  }
-  inline __RawMatrix operator / (const __RawMatrix& m) {
-    return { registerImage_ * m.registerImage_ };
+
+  template <int RowStart, int RowHeight>
+  inline auto& subTileView() {
+    static_assert(RowStart + RowHeight <= Height, "View out of bound.");
+    static_assert(ArraySize == 1,
+        "Can't view subtiles when arraysize is larger than 1.");
+
+    using __newMatrixType = __RawMatrix<T, RowHeight, Width, Transpose, SubGroupSize, ArraySize>;
+    using newStorageType = typename __newMatrixType::storageType;
+    constexpr auto ChunkSize = __newMatrixType::r_N;
+    static_assert(r_N % ChunkSize == 0, "Unevenly divided view to subtile was not supported");
+    constexpr auto __Offset = RowStart == 0 ? 0
+      : RegisterLayout<T, RowStart, Width, Transpose, SubGroupSize, ArraySize>::N;
+    constexpr auto Offset =  __Offset * sizeof(T)/sizeof(scalarType);
+
+    static_assert(Offset % ChunkSize == 0, "Unaligned offset to subtile was not supported");
+    constexpr auto ChunkOff = Offset / ChunkSize;
+
+    auto& splitImage = reinterpret_cast<
+      newStorageType (&)[sizeof(storageType) / sizeof(newStorageType)]
+    >(registerImage_);
+
+    return
+      reinterpret_cast<
+        __RawMatrix<T, RowHeight, Width, Transpose, SubGroupSize, ArraySize>&
+      >(splitImage[ChunkOff]);
   }
 
   template <CacheCtrl CTL = CacheCtrl::DEFAULT>
@@ -616,47 +681,6 @@ struct __RawMatrix {
   template <CacheCtrl CTL = CacheCtrl::DEFAULT>
   inline __RawMatrix& store(const AddressPayload<Height, Width, ArraySize> &address);
 
-  // Review as re-shuffled tensor in logic view, need careful review here.
-  template <DataShuffle reshuffle>
-  inline typename std::enable_if<Transpose == DataShuffle::vnni
-  && reshuffle == DataShuffle::none,
-    __RawMatrix<T, Height / 2, Width * 2, reshuffle, SubGroupSize, ArraySize>
-      >::type cast () {
-    return {registerImage_};
-  }
-
-  template <DataShuffle reshuffle>
-  inline typename std::enable_if<Transpose == DataShuffle::transpose
-  && reshuffle == DataShuffle::none,
-    __RawMatrix<T, Width, Height, reshuffle, SubGroupSize, ArraySize>
-      >::type cast() {
-    return {registerImage_};
-  }
-
-  template <DataShuffle reshuffle>
-  inline typename std::enable_if<Transpose == DataShuffle::none
-  && reshuffle == DataShuffle::vnni,
-    __RawMatrix<T, Height * 2, Width /2, reshuffle, SubGroupSize, ArraySize>
-      >::type cast() {
-    return {registerImage_};
-  }
-
-  template <DataShuffle reshuffle>
-  inline typename std::enable_if<Transpose == DataShuffle::none
-  && reshuffle == DataShuffle::transpose,
-    __RawMatrix<T, Width, Height, DataShuffle::transpose, SubGroupSize, ArraySize>
-      >::type cast() {
-    return {registerImage_};
-  }
-
-  //
-  // XXX: performance problem for SIMD16/sycl::half when compiler generate
-  // two instructions for single register operation.
-  //
-  inline void zero() {
-    registerImage_ =0;
-  }
-
 private:
-  rawType registerImage_;
+  storageType registerImage_;
 };

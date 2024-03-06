@@ -16,7 +16,7 @@ public:
 };
 
 template <typename T>
-inline T generateRandom(T a = -0.5, T b = 0.5) {
+static T generateRandom(T a = -0.5, T b = 0.5) {
   unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
   std::default_random_engine engine(seed);
   std::uniform_real_distribution<T> distribution(a, b);
@@ -25,23 +25,19 @@ inline T generateRandom(T a = -0.5, T b = 0.5) {
   // return 1;
 }
 
-template <typename T> T* allocDeviceAndInitAsync (
-    size_t size,
+template <typename T> static std::pair<T*, T*> allocDeviceAndInitAsync (
+    size_t nelems,
     std::function<void (T *data, size_t elems)> init_func,
     sycl::queue queue
 ) {
-  auto host_init = (T *)sycl::malloc_host(size * sizeof(T), queue);
-  auto device_ptr = (T *) sycl::malloc_device(size *sizeof(T), queue);
+  auto host_init = (T *)sycl::malloc_host(nelems * sizeof(T), queue);
+  auto device_ptr = (T *) sycl::malloc_device(nelems *sizeof(T), queue);
 
-  __scope_guard discardHost_ ([&] {
-      sycl::free(host_init, queue);
-  });
-
-  for (size_t i = 0; i < size; ++ i) {
+  for (size_t i = 0; i < nelems; ++ i) {
     init_func(host_init, i);
   }
-  queue.memcpy(device_ptr, host_init);
-  return device_ptr;
+  queue.memcpy(device_ptr, host_init, nelems * sizeof(T));
+  return std::make_pair(host_init, device_ptr);
 }
 
 template <typename T1, typename T2>
@@ -83,7 +79,7 @@ template <typename T>
 static void verifyGemm (
     const T *actual_result,
     const T *srcA, const T *srcB, int M,
-    int K, int N, int lda, int ldb, int ldc
+    int N, int K, int lda, int ldb, int ldc
 ) {
   std::vector<float> a(M * K), b(K * N);
   for (int i = 0; i < M; ++i) {
@@ -100,7 +96,7 @@ static void verifyGemm (
   std::vector<float> expected(M * N, 0);
 
   cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f,
-              a.data(), K, b.data(), N, 0, expected.data(), N);
+              a.data(), lda, b.data(), ldb, 0, expected.data(), ldc);
 
   bool res = allClose(actual_result, ldc, expected.data(), N, M, N);
   if (res)
