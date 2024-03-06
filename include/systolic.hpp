@@ -10,6 +10,14 @@ void dp4a(uint32_t& dst, uint32_t& accum, uint32_t a, uint32_t b) {
 }
 #endif
 
+extern "C" {
+typedef _Float16 half8 __attribute__((ext_vector_type(8)));
+typedef short short8 __attribute__((ext_vector_type(8)));
+typedef int int8 __attribute__((ext_vector_type(8)));
+
+extern SYCL_EXTERNAL half8 __builtin_IB_sub_group16_fdpas_hf_hf_hf_hf_8_8 (half8 acc, short8 a, int8 b);
+}
+
 namespace {
 struct systolic_config {
   static constexpr int Depth = 8;
@@ -46,6 +54,13 @@ template <
       __ArrayMatrix<IT1, M, K, DataShuffle::none, SubGroupSize, 1>& A,  /* src2 */
       __ArrayMatrix<IT2, K, N, DataShuffle::vnni, SubGroupSize, 1>& B   /* src1 */
   );
+
+  // Interface using intrinsics
+  template <int M> static inline void run(
+      __ArrayMatrix<OT, M, N, DataShuffle::none, SubGroupSize, 1>& C,   /* dst/src0 */
+      __RawMatrix<IT1, M, K, DataShuffle::none, SubGroupSize, 1>& A,  /* src2 */
+      __RawMatrix<IT2, K, N, DataShuffle::vnni, SubGroupSize, 1>& B   /* src1 */
+  );
 };
 
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
@@ -76,6 +91,12 @@ struct Dpas<
       __ArrayMatrix<sycl::half, M, N, DataShuffle::none, SubGroupSize, 1>&,
       __ArrayMatrix<sycl::half, M, K, DataShuffle::none, SubGroupSize, 1>&,
       __ArrayMatrix<sycl::half, K, N, DataShuffle::vnni, SubGroupSize, 1>&
+  );
+
+  template <int M> static inline void run(
+      __ArrayMatrix<sycl::half, M, N, DataShuffle::none, SubGroupSize, 1>&,
+      __RawMatrix<sycl::half, M, K, DataShuffle::none, SubGroupSize, 1>&,
+      __RawMatrix<sycl::half, K, N, DataShuffle::vnni, SubGroupSize, 1>&
   );
 
 #define GenRepeat(M)  \
@@ -151,6 +172,24 @@ struct Dpas<
         "}\n"
         : "+rw"(C.getStorage()): "rw"(A.getStorage()), "rw"(B.getStorage())
     );
+  }
+
+  template <>
+  inline void run<16>(
+      __ArrayMatrix<sycl::half, 16, N, DataShuffle::none, SubGroupSize, 1>& C,   /* dst */
+      __RawMatrix<sycl::half, 16, K, DataShuffle::none, SubGroupSize, 1>& A,  /* src2 */
+      __RawMatrix<sycl::half, K, N, DataShuffle::vnni, SubGroupSize, 1>& B   /* src1 */
+  ) {
+    auto& A_0 = A.template subTileView<0, 8>();
+    auto& A_1 = A.template subTileView<8, 8>();
+
+    auto& C_0 = C.template subTileView<0, 8>();
+    auto& C_1 = C.template subTileView<8, 8>();
+
+    C_0.getStorage() = __builtin_IB_sub_group16_fdpas_hf_hf_hf_hf_8_8(
+        C_0.getStorage(), A_0.getStorage(), B.getStorage());
+    C_1.getStorage() = __builtin_IB_sub_group16_fdpas_hf_hf_hf_hf_8_8(
+        C_1.getStorage(), A_1.getStorage(), B.getStorage());
   }
 
   template <>
@@ -261,6 +300,7 @@ struct Dpas<
 
 
 #endif
+}
 
 template <
   int M, int K, int N,
@@ -296,4 +336,19 @@ static inline void dpas(
   Dpas<OT, OT, IT1, IT2, SubGroupSize, systolic_config>::template run<M>(C, A, B);
 }
 
+template <
+  int M, int K, int N,
+  typename OT,
+  typename IT1,
+  typename IT2,
+  int SubGroupSize = 16,
+  typename config = systolic_config>
+static inline void dpas(
+    __ArrayMatrix<OT, M, N, DataShuffle::none, SubGroupSize, 1>& C,
+    __RawMatrix<IT1, M, K, DataShuffle::none, SubGroupSize, 1>& A,
+    __RawMatrix<IT2, K, N, DataShuffle::vnni, SubGroupSize, 1>& B
+) {
+  // TODO: check accepted parameters with static assert;
+  static_assert(SubGroupSize == 16, "SubGroupSize for dpas must be 16");
+  Dpas<OT, OT, IT1, IT2, SubGroupSize, systolic_config>::template run<M>(C, A, B);
 }

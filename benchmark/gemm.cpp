@@ -55,8 +55,8 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
       addressPrefetch_B.addSrc0AddrY(kElems);
     }
 
-    using mTA = __ArrayMatrix<T, 16, 16, DataShuffle::none, SubGroupSize>;
-    using mTB = __ArrayMatrix<T, 16, 16, DataShuffle::vnni, SubGroupSize, 2>;
+    using mTA = __RawMatrix<T, 16, 16, DataShuffle::none, SubGroupSize>;
+    using mTB = __RawMatrix<T, 16, 16, DataShuffle::vnni, SubGroupSize, 2>;
     using mTC = __ArrayMatrix<T, 16, 16, DataShuffle::none, SubGroupSize>;
 
     // Systolic march
@@ -78,13 +78,9 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
     for (int k = 0; k < K; k += kElems) {
       B_0.load(addressB_0);
       B_1.load(addressB_1);
-      // memcpy(&B_C0, &B_0, sizeof(B_0));
       A_0.load(addressA_0);
-      // memcpy(&B_C1, &B_1, sizeof(B_1));
       A_1.load(addressA_1);
-      // memcpy(&A_C0, &A_0, sizeof(A_0));
       addressPrefetch_B.prefetch<T, SubGroupSize>();
-      // memcpy(&A_C1, &A_1, sizeof(A_1));
       addressPrefetch_A.prefetch<T, SubGroupSize>();
 
       addressB_0.addSrc0AddrY(kElems);
@@ -101,8 +97,8 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
       dpas<SubGroupSize>(C_02, A_0, B_1.template subArrayView<0>());
       dpas<SubGroupSize>(C_12, A_1, B_1.template subArrayView<0>());
 
-      dpas<SubGroupSize>(C_03, A_0, B_0.template subArrayView<1>());
-      dpas<SubGroupSize>(C_13, A_1, B_0.template subArrayView<1>());
+      dpas<SubGroupSize>(C_03, A_0, B_1.template subArrayView<1>());
+      dpas<SubGroupSize>(C_13, A_1, B_1.template subArrayView<1>());
       swFence();
 
       addressA_1.addSrc0AddrX(kElems);

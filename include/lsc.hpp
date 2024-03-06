@@ -260,3 +260,36 @@ inline __ArrayMatrix<
   RawSendStore<DataWidth, PhyNumRegs, Transpose, CTL>::run(address, this->getStorage());
   return *this;
 }
+
+template <
+  typename T, int Height, int Width,
+  DataShuffle Transpose, int SubGroupSize, int ArraySize
+>
+template <CacheCtrl CTL>
+inline __RawMatrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>&
+__RawMatrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>::load(
+    const AddressPayload<Height, Width, ArraySize>& address
+) {
+  constexpr auto PhyNumRegs = __RawMatrix::PhyNumRegs;
+  constexpr auto DataWidth = __RawMatrix::LSCWidth;
+  RawSendLoad<DataWidth, PhyNumRegs, Transpose, CTL>::run(this->getStorage(), address);
+  return *this;
+}
+
+template <
+  typename T, int Height, int Width,
+  DataShuffle Transpose,
+  int SubGroupSize, int ArraySize
+> template <CacheCtrl CTL>
+inline __RawMatrix<
+  T, Height, Width, Transpose, SubGroupSize, ArraySize
+>& __RawMatrix<T, Height, Width, Transpose, SubGroupSize, ArraySize>::store(
+    const AddressPayload<Height, Width, ArraySize>& address
+) {
+  constexpr auto PhyNumRegs = __RawMatrix::PhyNumRegs;
+  constexpr auto DataWidth = Log2<sizeof(T)>();
+  static_assert(Transpose == DataShuffle::none, "Store support only none shuffled matrix");
+  static_assert(ArraySize == 1, "Store allows only single Array");
+  RawSendStore<DataWidth, PhyNumRegs, Transpose, CTL>::run(address, this->getStorage());
+  return *this;
+}
