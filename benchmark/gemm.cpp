@@ -146,10 +146,10 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
 #endif
 
   void operator()[[sycl::reqd_sub_group_size(SubGroupSize)]] (
-      sycl::nd_item<2>
+      sycl::nd_item<2> pos
   ) const {
-    constexpr int gpuYElems = 8 * 32 * 8;
-    constexpr int gpuXElems = 4 * 64 * 8;
+    constexpr int gpuYElems = pos.get_group_range()[0] * pos.get_local_range()[0] * 32;
+    constexpr int gpuXElems = pos.get_group_range()[1] * pos.get_local_range()[1]/SubGroupSize * 64;
 
 #if defined(__SYCL_DEVICE_ONLY__)
     for (int n = 0; n < N; n += gpuXElems)
@@ -227,7 +227,7 @@ int main(int argc, char *argv[]) {
 
   std::tie(C_host, C) = allocDeviceAndInitAsync<testType>(
       M * N, [](testType* a, size_t i) {
-        a[i] = static_cast<testType>(generateRandom<float>());
+        a[i] = 0;
       }, queue);
 
   __scope_guard __guard([&] {
