@@ -732,7 +732,7 @@ struct Concat<sycl::half, 8, 16, DataShuffle::none, 16> {
       "mov (M1, 16) aw(5,16)<1> alias_1w(2,16)<1;1,0>\n"
       "mov (M1, 16) %0(6,16)<1> alias_1f(3,0)<1;1,0>\n"
       "mov (M1, 16) aw(7,16)<1> alias_1w(3,16)<1;1,0>\n"
-      "\n}" : "=rw"(Output) : "rw"(M_0), "rw"(M_1)
+      "\n}" : "=rw"(Output.getStorage()) : "rw"(M_0.getStorage()), "rw"(M_1.getStorage())
     );
     return Output;
   }
@@ -749,5 +749,5 @@ static inline __ArrayMatrix<
     const __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, 1>& M_0,
     const __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, 1>& M_1
 ) {
-  return Concat<T, Height, Width, Transpose, SubGroupSize>(M_0, M_1);
+  return Concat<T, Height, Width, Transpose, SubGroupSize>::run(M_0, M_1);
 }
