@@ -684,3 +684,70 @@ struct __RawMatrix {
 private:
   storageType registerImage_;
 };
+
+template <
+    typename T, int Height, int Width,
+    DataShuffle Transpose = DataShuffle::none,
+    int SubGroupSize = 16
+> struct Concat {
+  static inline __ArrayMatrix<
+    T, Height, Width * 2, Transpose, SubGroupSize, 1
+  > run(
+    const __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, 1>& M_0,
+    const __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, 1>& M_1
+  );
+};
+
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
+template<>
+struct Concat<sycl::half, 8, 16, DataShuffle::none, 16> {
+  static inline __ArrayMatrix<
+    sycl::half, 8, 32, DataShuffle::none, 16, 1
+  > run(
+      const __ArrayMatrix<sycl::half, 8, 16, DataShuffle::none, 16, 1>& M_0,
+      const __ArrayMatrix<sycl::half, 8, 16, DataShuffle::none, 16, 1>& M_1
+  ) {
+    __ArrayMatrix<
+      sycl::half, 8, 32, DataShuffle::none, 16, 1
+    > Output;
+    asm volatile ("{\n"
+      ".decl alias_0f v_type=G type=hf num_elts=128 align=wordx32 alias=<%1, 0>\n"
+      ".decl alias_0w v_type=G type=uw num_elts=128 align=wordx32 alias=<%1, 0>\n"
+      ".decl alias_1f v_type=G type=hf num_elts=128 align=wordx32 alias=<%2, 0>\n"
+      ".decl alias_1w v_type=G type=uw num_elts=128 align=wordx32 alias=<%2, 0>\n"
+      ".decl aw v_type=G type=uw num_elts=128 align=wordx32 alias=<%0, 0>\n"
+      "mov (M1, 16) %0(0,0)<1>  alias_0f(0,0)<1;1,0>\n"
+      "mov (M1, 16) aw(1,0)<1>  alias_0w(0,16)<1;1,0>\n"
+      "mov (M1, 16) %0(2,0)<1>  alias_0f(1,0)<1;1,0>\n"
+      "mov (M1, 16) aw(3,0)<1>  alias_0w(1,16)<1;1,0>\n"
+      "mov (M1, 16) %0(4,0)<1>  alias_0f(2,0)<1;1,0>\n"
+      "mov (M1, 16) aw(5,0)<1>  alias_0w(2,16)<1;1,0>\n"
+      "mov (M1, 16) %0(6,0)<1>  alias_0f(3,0)<1;1,0>\n"
+      "mov (M1, 16) aw(7,0)<1>  alias_0w(3,16)<1;1,0>\n"
+      "mov (M1, 16) %0(0,16)<1> alias_1f(0,0)<1;1,0>\n"
+      "mov (M1, 16) aw(1,16)<1> alias_1w(0,16)<1;1,0>\n"
+      "mov (M1, 16) %0(2,16)<1> alias_1f(1,0)<1;1,0>\n"
+      "mov (M1, 16) aw(3,16)<1> alias_1w(1,16)<1;1,0>\n"
+      "mov (M1, 16) %0(4,16)<1> alias_1f(2,0)<1;1,0>\n"
+      "mov (M1, 16) aw(5,16)<1> alias_1w(2,16)<1;1,0>\n"
+      "mov (M1, 16) %0(6,16)<1> alias_1f(3,0)<1;1,0>\n"
+      "mov (M1, 16) aw(7,16)<1> alias_1w(3,16)<1;1,0>\n"
+      "\n}" : "=rw"(Output) : "rw"(M_0), "rw"(M_1)
+    );
+    return Output;
+  }
+};
+#endif
+
+template <
+    typename T, int Height, int Width,
+    DataShuffle Transpose = DataShuffle::none,
+    int SubGroupSize = 16>
+static inline __ArrayMatrix<
+    T, Height, Width * 2, Transpose, SubGroupSize, 1
+> concat(
+    const __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, 1>& M_0,
+    const __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, 1>& M_1
+) {
+  return Concat<T, Height, Width, Transpose, SubGroupSize>(M_0, M_1);
+}
