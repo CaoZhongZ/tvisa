@@ -159,25 +159,14 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
   }
 
   static sycl::event launch(
-      sycl::queue queue, uint32_t M, uint32_t N, uint32_t K,
+      sycl::queue queue, sycl::nd_range<2> launch_param,
+      int32_t M, uint32_t N, uint32_t K,
       T* A, uint32_t lda, T* B, uint32_t ldb, T* C, uint32_t ldc
   ) {
-    size_t nGroupM = 8;
-    size_t nGroupN = 8;
-
-    size_t nSubGroupM = 8;
-    size_t nSubGroupN = 4;
-
-    sycl::range<2> local(nSubGroupM, nSubGroupN * SubGroupSize);
-    sycl::range<2> global(nGroupM, nGroupN);
-
     return queue.submit(
       [&](sycl::handler &h) {
-        h.parallel_for(
-            sycl::nd_range<2>(global * local, local),
-            gemmKernel(M, N, K, A, lda, B, ldb, C, ldc)
-        );
-      });
+        h.parallel_for(launch_param, gemmKernel(M, N, K, A, lda, B, ldb, C, ldc));
+    });
   }
 private:
   int M, N, K;
@@ -198,6 +187,10 @@ int main(int argc, char *argv[]) {
     ("a,lda", "Leading dimension of A", cxxopts::value<int>()->default_value("4096"))
     ("b,ldb", "Leading dimension of B", cxxopts::value<int>()->default_value("4096"))
     ("c,ldc", "Leading dimension of C", cxxopts::value<int>()->default_value("4096"))
+    ("m,groupM", "Groups alone M dimention to launch", cxxopts::value<size_t>()->default_value("8"))
+    ("n,groupN", "Groups alone N dimention to launch", cxxopts::value<size_t>()->default_value("8"))
+    ("l,subGroupM", "Sub-Groups alone M dimention to launch", cxxopts::value<size_t>()->default_value("8"))
+    ("w,subGroupN", "Sub-Groups alone N dimention to launch", cxxopts::value<size_t>()->default_value("4"))
     ;
 
   auto parsed_opts = opts.parse(argc, argv);
@@ -208,6 +201,11 @@ int main(int argc, char *argv[]) {
   auto lda = parsed_opts["lda"].as<int>();
   auto ldb = parsed_opts["ldb"].as<int>();
   auto ldc = parsed_opts["ldc"].as<int>();
+
+  auto nGroupM = parsed_opts["m"].as<size_t>();
+  auto nGroupN = parsed_opts["n"].as<size_t>();
+  auto nSubGroupM = parsed_opts["l"].as<size_t>();
+  auto nSubGroupN = parsed_opts["w"].as<size_t>();
 
   typedef sycl::half testType;
 
@@ -242,18 +240,27 @@ int main(int argc, char *argv[]) {
     sycl::free(C_host, queue);
   });
 
-  gemmKernel<testType, 16>::launch(queue, M, N, K, A, lda, B, ldb, C, ldc);
-  queue.memcpy(C_host, C, sizeof(testType) * M * N).wait();
+  sycl::range<2> local(nSubGroupM, nSubGroupN * SubGroupSize);
+  sycl::range<2> global(nGroupM, nGroupN);
+  sycl::nd_range<2> param (global * local, local);
 
+  gemmKernel<testType, 16>::launch(
+      queue, param, M, N, K, A, lda, B, ldb, C, ldc);
+
+  queue.memcpy(C_host, C, sizeof(testType) * M * N).wait();
   verifyGemm(C_host, A_host, B_host, M, N, K, lda, ldb, ldc);
 
   constexpr const int iter = 20;
   float durations = 0.f;
 
-  gemmKernel<testType, 16>::launch(queue, M, N, K, A, lda, B, ldb, C, ldc);
+  gemmKernel<testType, 16>::launch(
+      queue, param, M, N, K, A, lda, B, ldb, C, ldc
+  );
 
   for (int i = 0; i < iter; ++i) {
-    auto e = gemmKernel<testType, 16>::launch(queue, M, N, K, A, lda, B, ldb, C, ldc);
+    auto e = gemmKernel<testType, 16>::launch(
+        queue, param, M, N, K, A, lda, B, ldb, C, ldc
+    );
     durations += timeEvent(e);
   }
 
