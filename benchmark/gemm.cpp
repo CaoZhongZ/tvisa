@@ -131,7 +131,7 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
     C_merge11.store(address_C);
 
     auto C_merge10 = concat(
-        C_02.template subTileView<8, 8>(), C_03.template subTileView<8, 8>()
+        C_00.template subTileView<8, 8>(), C_01.template subTileView<8, 8>()
     );
     address_C.addSrc0AddrX(-32);
     C_merge10.store(address_C);
@@ -149,13 +149,13 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
     C_merge21.store(address_C);
 
     auto C_merge31 = concat(
-        C_10.template subTileView<8, 8>(), C_11.template subTileView<8, 8>()
+        C_12.template subTileView<8, 8>(), C_13.template subTileView<8, 8>()
     );
     address_C.addSrc0AddrY(8);
     C_merge31.store(address_C);
 
     auto C_merge30 = concat(
-        C_12.template subTileView<8, 8>(), C_13.template subTileView<8, 8>()
+        C_10.template subTileView<8, 8>(), C_11.template subTileView<8, 8>()
     );
     address_C.addSrc0AddrX(-32);
     C_merge30.store(address_C);
@@ -258,12 +258,14 @@ int main(int argc, char *argv[]) {
 
   std::tie(A_host, A) = allocDeviceAndInitAsync<testType>(
       M * K, [](testType* a, size_t i) {
-        a[i] = static_cast<testType>((float)i/100.);
+        a[i] = static_cast<testType>(generateRandom<float>());
+        // a[i] = static_cast<testType>((float)i);
       }, queue);
 
   std::tie(B_host, B) = allocDeviceAndInitAsync<testType>(
       K * N, [](testType* a, size_t i) {
-        a[i] = static_cast<testType>((float)i/100.);
+        a[i] = static_cast<testType>(generateRandom<float>());
+        // a[i] = static_cast<testType>((float)i);
       }, queue);
 
   std::tie(C_host, C) = allocDeviceAndInitAsync<testType>(

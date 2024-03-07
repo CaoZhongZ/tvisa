@@ -430,7 +430,7 @@ struct __ArrayMatrix {
   static_assert(NumRegs == sizeof(T) * N/sizeof(uint32_t));
 
   using scalarType = typename StorageScalarType<T>::type;
-  using storageType = __attribute__((ext_vector_type(N))) scalarType;
+  using storageType = scalarType __attribute__((ext_vector_type(N)));
 
   inline storageType& getStorage() {
     return registerImage_;
@@ -476,17 +476,16 @@ struct __ArrayMatrix {
   inline auto& subArrayView() {
     static_assert(ArrayOff + newArraySize <= ArraySize);
 
-    using newStorageType = typename __ArrayMatrix<
+    using __newMatrixType = __ArrayMatrix<
       T, Height, Width, Transpose, SubGroupSize, newArraySize
-    >::storageType;
+    >;
+    using newStorageType = typename __newMatrixType::storageType;
 
     auto& splitImage = reinterpret_cast<
       newStorageType (&)[sizeof(storageType)/sizeof(newStorageType)]
     >(registerImage_);
 
-    return reinterpret_cast<
-      __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, newArraySize>&
-    >(splitImage[ArrayOff]);
+    return reinterpret_cast<__newMatrixType&>(splitImage[ArrayOff]);
   }
 
   // Another form???

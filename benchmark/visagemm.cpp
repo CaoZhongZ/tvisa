@@ -1,6 +1,8 @@
 #include <cmath>
 #include <mkl.h>
 #include <random>
+#include <iostream>
+#include <iomanip>
 #include <sycl/sycl.hpp>
 
 #include "cxxopts.hpp"
@@ -15,7 +17,9 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
       const T *A, uint32_t lda,
       const T *B, uint32_t ldb,
       T *C,  uint32_t ldc
-  ) : M(M), N(N), K(K), lda(lda), ldb(ldb), ldc(ldc), A(A), B(B), C(C) {}
+  ) : M(M), N(N), K(K),
+  pitchA(lda * sizeof(T)), pitchB(ldb * sizeof(T)), pitchC(ldc * sizeof(T)),
+  A(A), B(B), C(C) {}
 
 #if defined(__SYCL_DEVICE_ONLY__)
   inline void rawSampleSubGroupGemm(int groupStartM, int groupStartN) const {
@@ -28,9 +32,9 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
     auto sg_Y = pos.get_local_id()[0];
     auto sg_X = pos.get_local_id()[1] / SubGroupSize;
 
-    AddressPayload<16, 16> addressA_0(A, M, K, lda,
+    AddressPayload<16, 16> addressA_0(A, M, K * sizeof(T), pitchA,
         0, groupStartM + sg_Y * mElems);
-    AddressPayload<16, 16, 2> addressB_0(B, K, N, ldb,
+    AddressPayload<16, 16, 2> addressB_0(B, K, N * sizeof(T), pitchB,
         groupStartN + sg_X * nElems, 0);
 
     AddressPayload<16, 16> addressA_1(addressA_0);
@@ -106,28 +110,55 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
       addressPrefetch_A.addSrc0AddrX(kElems);
    }
 
-    AddressPayload<8, 16> address_C(C, M, N, ldc,
+    AddressPayload<8, 32> address_C(C, M, N * sizeof(T), pitchC,
         groupStartN + sg_X * nElems, groupStartM + sg_Y * mElems);
 
-    C_00.template subTileView<0, 8>().store(address_C);
-    C_00.template subTileView<8, 8>().store(address_C.addSrc0AddrY(8));
-    C_10.template subTileView<0, 8>().store(address_C.addSrc0AddrY(8));
-    C_10.template subTileView<8, 8>().store(address_C.addSrc0AddrY(8));
+    auto C_merge00 = concat(
+        C_00.template subTileView<0, 8>(), C_01.template subTileView<0, 8>()
+    );
+    C_merge00.store(address_C);
 
-    C_11.template subTileView<8, 8>().store(address_C.addSrc0AddrX(16));
-    C_11.template subTileView<0, 8>().store(address_C.addSrc0AddrY(-8));
-    C_01.template subTileView<8, 8>().store(address_C.addSrc0AddrY(-8));
-    C_01.template subTileView<0, 8>().store(address_C.addSrc0AddrY(-8));
+    auto C_merge01 = concat(
+        C_02.template subTileView<0, 8>(), C_03.template subTileView<0, 8>()
+    );
+    address_C.addSrc0AddrX(32);
+    C_merge01.store(address_C);
 
-    C_02.template subTileView<0, 8>().store(address_C.addSrc0AddrX(16));
-    C_02.template subTileView<8, 8>().store(address_C.addSrc0AddrY(8));
-    C_12.template subTileView<0, 8>().store(address_C.addSrc0AddrY(8));
-    C_12.template subTileView<8, 8>().store(address_C.addSrc0AddrY(8));
+    auto C_merge11 = concat(
+        C_02.template subTileView<8, 8>(), C_03.template subTileView<8, 8>()
+    );
+    address_C.addSrc0AddrY(8);
+    C_merge11.store(address_C);
 
-    C_13.template subTileView<8, 8>().store(address_C.addSrc0AddrX(16));
-    C_13.template subTileView<0, 8>().store(address_C.addSrc0AddrY(-8));
-    C_03.template subTileView<8, 8>().store(address_C.addSrc0AddrY(-8));
-    C_03.template subTileView<0, 8>().store(address_C.addSrc0AddrY(-8));
+    auto C_merge10 = concat(
+        C_00.template subTileView<8, 8>(), C_01.template subTileView<8, 8>()
+    );
+    address_C.addSrc0AddrX(-32);
+    C_merge10.store(address_C);
+
+    auto C_merge20 = concat(
+        C_10.template subTileView<0, 8>(), C_11.template subTileView<0, 8>()
+    );
+    address_C.addSrc0AddrY(8);
+    C_merge20.store(address_C);
+
+    auto C_merge21 = concat(
+        C_12.template subTileView<0, 8>(), C_13.template subTileView<0, 8>()
+    );
+    address_C.addSrc0AddrX(32);
+    C_merge21.store(address_C);
+
+    auto C_merge31 = concat(
+        C_12.template subTileView<8, 8>(), C_13.template subTileView<8, 8>()
+    );
+    address_C.addSrc0AddrY(8);
+    C_merge31.store(address_C);
+
+    auto C_merge30 = concat(
+        C_10.template subTileView<8, 8>(), C_11.template subTileView<8, 8>()
+    );
+    address_C.addSrc0AddrX(-32);
+    C_merge30.store(address_C);
   }
 
   inline void groupGemm(int globalStartM, int globalStartN) const {
@@ -135,8 +166,8 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
     auto gid_M = pos.get_group().get_group_id()[0];
     auto gid_N = pos.get_group().get_group_id()[1];
 
-    constexpr int groupYElems = 8 * 32;
-    constexpr int groupXElems = 4 * 64;
+    int groupYElems = pos.get_local_range()[0] * 32;
+    int groupXElems = pos.get_local_range()[1]/SubGroupSize * 64;
 
     auto groupStartM = globalStartM + groupYElems * gid_M;
     auto groupStartN = globalStartN + groupXElems * gid_N;
@@ -146,10 +177,10 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
 #endif
 
   void operator()[[sycl::reqd_sub_group_size(SubGroupSize)]] (
-      sycl::nd_item<2>
+      sycl::nd_item<2> pos
   ) const {
-    constexpr int gpuYElems = 8 * 32 * 8;
-    constexpr int gpuXElems = 4 * 64 * 8;
+    int gpuYElems = pos.get_group_range()[0] * pos.get_local_range()[0] * 32;
+    int gpuXElems = pos.get_group_range()[1] * pos.get_local_range()[1]/SubGroupSize * 64;
 
 #if defined(__SYCL_DEVICE_ONLY__)
     for (int n = 0; n < N; n += gpuXElems)
@@ -159,34 +190,32 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
   }
 
   static sycl::event launch(
-      sycl::queue queue, uint32_t M, uint32_t N, uint32_t K,
+      sycl::queue queue, sycl::nd_range<2> launch_param,
+      int32_t M, uint32_t N, uint32_t K,
       T* A, uint32_t lda, T* B, uint32_t ldb, T* C, uint32_t ldc
   ) {
-    size_t nGroupM = 8;
-    size_t nGroupN = 8;
-
-    size_t nSubGroupM = 8;
-    size_t nSubGroupN = 4;
-
-    sycl::range<2> local(nSubGroupM, nSubGroupN * SubGroupSize);
-    sycl::range<2> global(nGroupM, nGroupN);
-
     return queue.submit(
       [&](sycl::handler &h) {
-        h.parallel_for(
-            sycl::nd_range<2>(global * local, local),
-            gemmKernel(M, N, K, A, lda, B, ldb, C, ldc)
-        );
-      });
+        h.parallel_for(launch_param, gemmKernel(M, N, K, A, lda, B, ldb, C, ldc));
+    });
   }
 private:
   int M, N, K;
-  int lda, ldb, ldc;
+  // GPU convention
+  int pitchA, pitchB, pitchC;
 
   const T *A;
   const T *B;
   T *C;
 };
+
+template <typename T> void dumpMatrix(T* C, int M, int N, int ldc) {
+  for (int i = 0; i < M; ++ i) {
+    for (int j = 0; j < N; ++ j)
+      std::cout<<C[i * ldc + j]<<", ";
+    std::cout<<std::endl;
+  }
+}
 
 int main(int argc, char *argv[]) {
   cxxopts::Options opts("gemm", "Systolic GEMM test");
@@ -198,6 +227,10 @@ int main(int argc, char *argv[]) {
     ("a,lda", "Leading dimension of A", cxxopts::value<int>()->default_value("4096"))
     ("b,ldb", "Leading dimension of B", cxxopts::value<int>()->default_value("4096"))
     ("c,ldc", "Leading dimension of C", cxxopts::value<int>()->default_value("4096"))
+    ("m,groupM", "Groups alone M dimention to launch", cxxopts::value<size_t>()->default_value("8"))
+    ("n,groupN", "Groups alone N dimention to launch", cxxopts::value<size_t>()->default_value("8"))
+    ("l,subGroupM", "Sub-Groups alone M dimention to launch", cxxopts::value<size_t>()->default_value("8"))
+    ("w,subGroupN", "Sub-Groups alone N dimention to launch", cxxopts::value<size_t>()->default_value("4"))
     ;
 
   auto parsed_opts = opts.parse(argc, argv);
@@ -205,11 +238,17 @@ int main(int argc, char *argv[]) {
   auto M = parsed_opts["M_"].as<int>();
   auto K = parsed_opts["K_"].as<int>();
   auto N = parsed_opts["N_"].as<int>();
+
+  typedef sycl::half testType;
+
   auto lda = parsed_opts["lda"].as<int>();
   auto ldb = parsed_opts["ldb"].as<int>();
   auto ldc = parsed_opts["ldc"].as<int>();
 
-  typedef sycl::half testType;
+  auto nGroupM = parsed_opts["m"].as<size_t>();
+  auto nGroupN = parsed_opts["n"].as<size_t>();
+  auto nSubGroupM = parsed_opts["l"].as<size_t>();
+  auto nSubGroupN = parsed_opts["w"].as<size_t>();
 
   sycl::queue queue = currentQueue(0, 0);
 
@@ -219,17 +258,19 @@ int main(int argc, char *argv[]) {
 
   std::tie(A_host, A) = allocDeviceAndInitAsync<testType>(
       M * K, [](testType* a, size_t i) {
-        a[i] = static_cast<testType>(generateRandom<float>());
+        // a[i] = static_cast<testType>((float)i);
+        a[i] = 1.;
       }, queue);
 
   std::tie(B_host, B) = allocDeviceAndInitAsync<testType>(
       K * N, [](testType* a, size_t i) {
-        a[i] = static_cast<testType>(generateRandom<float>());
+        a[i] = static_cast<testType>((float)i);
+        // a[i] = 1.;
       }, queue);
 
   std::tie(C_host, C) = allocDeviceAndInitAsync<testType>(
       M * N, [](testType* a, size_t i) {
-        a[i] = static_cast<testType>(generateRandom<float>());
+        a[i] = 0;
       }, queue);
 
   __scope_guard __guard([&] {
@@ -242,18 +283,31 @@ int main(int argc, char *argv[]) {
     sycl::free(C_host, queue);
   });
 
-  gemmKernel<testType, 16>::launch(queue, M, N, K, A, lda, B, ldb, C, ldc);
+  constexpr int SG_SZ = 16;
+
+  sycl::range<2> local(nSubGroupM, nSubGroupN * SG_SZ);
+  sycl::range<2> global(nGroupM, nGroupN);
+  sycl::nd_range<2> param (global * local, local);
+
+  gemmKernel<testType, SG_SZ>::launch(
+      queue, param, M, N, K, A, lda, B, ldb, C, ldc);
+
   queue.memcpy(C_host, C, sizeof(testType) * M * N).wait();
 
   verifyGemm(C_host, A_host, B_host, M, N, K, lda, ldb, ldc);
+  dumpMatrix(C_host, M, N, ldc);
 
   constexpr const int iter = 20;
   float durations = 0.f;
 
-  gemmKernel<testType, 16>::launch(queue, M, N, K, A, lda, B, ldb, C, ldc);
+  gemmKernel<testType, SG_SZ>::launch(
+      queue, param, M, N, K, A, lda, B, ldb, C, ldc
+  );
 
   for (int i = 0; i < iter; ++i) {
-    auto e = gemmKernel<testType, 16>::launch(queue, M, N, K, A, lda, B, ldb, C, ldc);
+    auto e = gemmKernel<testType, SG_SZ>::launch(
+        queue, param, M, N, K, A, lda, B, ldb, C, ldc
+    );
     durations += timeEvent(e);
   }
 
