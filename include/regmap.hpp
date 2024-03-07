@@ -640,12 +640,11 @@ struct __RawMatrix {
       T, Height, Width, Transpose, SubGroupSize, newArraySize
     >;
     using newStorageType = typename __newMatrixType::storageType;
+    typedef newStorageType newStorageArrayType[sizeof(storageType)/sizeof(newStorageType)];
 
-    auto& splitImage = reinterpret_cast<
-      newStorageType (&)[sizeof(storageType)/sizeof(newStorageType)]
-    >(registerImage_);
+    auto splitImage = __builtin_bit_cast(newStorageArrayType, registerImage_);
 
-    return reinterpret_cast<__newMatrixType&>(splitImage[ArrayOff]);
+    return __builtin_bit_cast(__newMatrixType, splitImage[ArrayOff]);
   }
 
   template <int RowStart, int RowHeight>
@@ -664,15 +663,13 @@ struct __RawMatrix {
 
     static_assert(Offset % ChunkSize == 0, "Unaligned offset to subtile was not supported");
     constexpr auto ChunkOff = Offset / ChunkSize;
+    typedef newStorageType newStorageArrayType[sizeof(storageType)/sizeof(newStorageType)];
 
-    auto& splitImage = reinterpret_cast<
-      newStorageType (&)[sizeof(storageType) / sizeof(newStorageType)]
-    >(registerImage_);
+    auto splitImage = __builtin_bit_cast(newStorageArrayType, registerImage_);
 
     return
-      reinterpret_cast<
-        __RawMatrix<T, RowHeight, Width, Transpose, SubGroupSize, ArraySize>&
-      >(splitImage[ChunkOff]);
+      __builtin_bit_cast(
+        __RawMatrix<T, RowHeight, Width, Transpose, SubGroupSize, ArraySize>, splitImage[ChunkOff]);
   }
 
   template <CacheCtrl CTL = CacheCtrl::DEFAULT>
