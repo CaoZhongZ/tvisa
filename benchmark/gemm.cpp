@@ -32,7 +32,6 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
     auto sg_Y = pos.get_local_id()[0];
     auto sg_X = pos.get_local_id()[1] / SubGroupSize;
 
-    /*
     AddressPayload<16, 16> addressA_0(A, M, K * sizeof(T), pitchA,
         0, groupStartM + sg_Y * mElems);
     AddressPayload<16, 16, 2> addressB_0(B, K, N * sizeof(T), pitchB,
@@ -61,27 +60,24 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
     }
 
     using mTA = __RawMatrix<T, 16, 16, DataShuffle::none, SubGroupSize>;
-    using mTB = __RawMatrix<T, 16, 16, DataShuffle::vnni, SubGroupSize, 2>;*/
+    using mTB = __RawMatrix<T, 16, 16, DataShuffle::vnni, SubGroupSize, 2>;
     using mTC = __ArrayMatrix<T, 16, 16, DataShuffle::none, SubGroupSize>;
 
-    /*
     // Systolic march
     mTA A_0, A_1;//  mTA A_C0, A_C1;
     mTB B_0, B_1;//  mTB B_C0, B_C1;
-                 //  */
 
     mTC C_00, C_01, C_02, C_03;
     mTC C_10, C_11, C_12, C_13;
 
-    memset(&C_00, 1, sizeof(mTC));
-    memset(&C_01, 1, sizeof(mTC));
-    memset(&C_02, 1, sizeof(mTC));
-    memset(&C_03, 1, sizeof(mTC));
-    memset(&C_10, 1, sizeof(mTC));
-    memset(&C_11, 1, sizeof(mTC));
-    memset(&C_12, 1, sizeof(mTC));
-    memset(&C_13, 1, sizeof(mTC));
-    /*
+    memset(&C_00, 0, sizeof(mTC));
+    memset(&C_01, 0, sizeof(mTC));
+    memset(&C_02, 0, sizeof(mTC));
+    memset(&C_03, 0, sizeof(mTC));
+    memset(&C_10, 0, sizeof(mTC));
+    memset(&C_11, 0, sizeof(mTC));
+    memset(&C_12, 0, sizeof(mTC));
+    memset(&C_13, 0, sizeof(mTC));
 
     for (int k = 0; k < K; k += kElems) {
       B_0.load(addressB_0);
@@ -113,31 +109,56 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
       addressPrefetch_B.addSrc0AddrY(kElems);
       addressPrefetch_A.addSrc0AddrX(kElems);
    }
-   */
 
-    AddressPayload<16, 16> address_C(C, M, N * sizeof(T), pitchC,
+    AddressPayload<8, 32> address_C(C, M, N * sizeof(T), pitchC,
         groupStartN + sg_X * nElems, groupStartM + sg_Y * mElems);
 
-    lscStore(address_C, C_00);
-    // C_00.store(address_C);
-    // C_00.template subTileView<8, 8>().store(address_C.addSrc0AddrY(8));
-    // C_10.template subTileView<0, 8>().store(address_C.addSrc0AddrY(8));
-    // C_10.template subTileView<8, 8>().store(address_C.addSrc0AddrY(8));
+    auto C_merge00 = concat(
+        C_00.template subTileView<0, 8>(), C_01.template subTileView<0, 8>()
+    );
+    C_merge00.store(address_C);
 
-    // C_11.template subTileView<8, 8>().store(address_C.addSrc0AddrX(16));
-    // C_11.template subTileView<0, 8>().store(address_C.addSrc0AddrY(-8));
-    // C_01.template subTileView<8, 8>().store(address_C.addSrc0AddrY(-8));
-    // C_01.template subTileView<0, 8>().store(address_C.addSrc0AddrY(-8));
+    auto C_merge01 = concat(
+        C_02.template subTileView<0, 8>(), C_03.template subTileView<0, 8>()
+    );
+    address_C.addSrc0AddrX(32);
+    C_merge01.store(address_C);
 
-    // C_02.template subTileView<0, 8>().store(address_C.addSrc0AddrX(16));
-    // C_02.template subTileView<8, 8>().store(address_C.addSrc0AddrY(8));
-    // C_12.template subTileView<0, 8>().store(address_C.addSrc0AddrY(8));
-    // C_12.template subTileView<8, 8>().store(address_C.addSrc0AddrY(8));
+    auto C_merge11 = concat(
+        C_02.template subTileView<8, 8>(), C_03.template subTileView<8, 8>()
+    );
+    address_C.addSrc0AddrY(8);
+    C_merge11.store(address_C);
 
-    // C_13.template subTileView<8, 8>().store(address_C.addSrc0AddrX(16));
-    // C_13.template subTileView<0, 8>().store(address_C.addSrc0AddrY(-8));
-    // C_03.template subTileView<8, 8>().store(address_C.addSrc0AddrY(-8));
-    // C_03.template subTileView<0, 8>().store(address_C.addSrc0AddrY(-8));
+    auto C_merge10 = concat(
+        C_02.template subTileView<8, 8>(), C_03.template subTileView<8, 8>()
+    );
+    address_C.addSrc0AddrX(-32);
+    C_merge10.store(address_C);
+
+    auto C_merge20 = concat(
+        C_10.template subTileView<0, 8>(), C_11.template subTileView<0, 8>()
+    );
+    address_C.addSrc0AddrY(8);
+    C_merge20.store(address_C);
+
+    auto C_merge21 = concat(
+        C_12.template subTileView<0, 8>(), C_13.template subTileView<0, 8>()
+    );
+    address_C.addSrc0AddrX(32);
+    C_merge21.store(address_C);
+
+    auto C_merge31 = concat(
+        C_10.template subTileView<8, 8>(), C_11.template subTileView<8, 8>()
+    );
+    address_C.addSrc0AddrY(8);
+    C_merge31.store(address_C);
+
+    auto C_merge30 = concat(
+        C_12.template subTileView<8, 8>(), C_13.template subTileView<8, 8>()
+    );
+    address_C.addSrc0AddrX(-32);
+    C_merge30.store(address_C);
   }
 
   inline void groupGemm(int globalStartM, int globalStartN) const {
