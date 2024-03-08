@@ -22,20 +22,21 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
   A(A), B(B), C(C) {}
 
 #if defined(__SYCL_DEVICE_ONLY__)
-  inline void rawSampleSubGroupGemm(int groupStartM, int groupStartN) const {
+  inline void rawSampleSubGroupGemm(int subStartM, int subStartN) const {
     constexpr int mElems = 16;
     constexpr int nElems = 16 * 2;
     constexpr int kElems = 16;
 
     auto pos = sycl::ext::oneapi::experimental::this_nd_item<2>();
-
     auto sg_Y = pos.get_local_id()[0];
     auto sg_X = pos.get_local_id()[1] / SubGroupSize;
 
-    AddressPayload<16, 16> addressA_0(A, M, K * sizeof(T), pitchA,
-        0, groupStartM + sg_Y * mElems);
-    AddressPayload<16, 16, 2> addressB_0(B, K, N * sizeof(T), pitchB,
-        groupStartN + sg_X * nElems, 0);
+    AddressPayload<16, 16> addressA_0(
+        A, M, K * sizeof(T), pitchA, 0, subStartM
+    );
+    AddressPayload<16, 16, 2> addressB_0(
+        B, K, N * sizeof(T), pitchB, subStartN, 0
+    );
 
     AddressPayload<16, 16> addressA_1(addressA_0);
     AddressPayload<16, 16, 2> addressB_1(addressB_0);
@@ -110,8 +111,9 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
       addressPrefetch_A.addSrc0AddrX(kElems);
    }
 
-    AddressPayload<8, 32> address_C(C, M, N * sizeof(T), pitchC,
-        groupStartN + sg_X * nElems, groupStartM + sg_Y * mElems);
+    AddressPayload<8, 32> address_C(
+        C, M, N * sizeof(T), pitchC, subStartN, subStartM
+    );
 
     auto C_merge00 = concat(
         C_00.template subTileView<0, 8>(), C_01.template subTileView<0, 8>()
@@ -161,7 +163,21 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
     C_merge30.store(address_C);
   }
 
-  inline void groupGemm(int globalStartM, int globalStartN) const {
+  inline void groupGemm(int groupStartM, int groupStartN) const {
+    auto pos = sycl::ext::oneapi::experimental::this_nd_item<2>();
+    auto sub_M = pos.get_local_id()[0];
+    auto sub_N = pos.get_local_id()[1]/SubGroupSize;
+
+    int subYElems = 32;
+    int subXElems = 64;
+
+    auto subStartM = groupStartM + subYElems * sub_M;
+    auto subStartN = groupStartN + subXElems * sub_N;
+
+    rawSampleSubGroupGemm(subStartM, subStartN);
+  }
+
+  inline void topGemm(int globalStartM, int globalStartN) const {
     auto pos = sycl::ext::oneapi::experimental::this_nd_item<2>();
     auto gid_M = pos.get_group().get_group_id()[0];
     auto gid_N = pos.get_group().get_group_id()[1];
@@ -172,7 +188,7 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
     auto groupStartM = globalStartM + groupYElems * gid_M;
     auto groupStartN = globalStartN + groupXElems * gid_N;
 
-    rawSampleSubGroupGemm(groupStartM, groupStartN);
+    groupGemm(groupStartM, groupStartN);
   }
 #endif
 
@@ -185,7 +201,7 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
 #if defined(__SYCL_DEVICE_ONLY__)
     for (int n = 0; n < N; n += gpuXElems)
       for (int m = 0; m < M; m += gpuYElems)
-        groupGemm(m, n);
+        topGemm(m, n);
 #endif
   }
 
@@ -224,9 +240,9 @@ int main(int argc, char *argv[]) {
     ("M,M_", "M dimension", cxxopts::value<int>()->default_value("4096"))
     ("K,K_", "K dimension", cxxopts::value<int>()->default_value("4096"))
     ("N,N_", "N dimension", cxxopts::value<int>()->default_value("4096"))
-    ("a,lda", "Leading dimension of A", cxxopts::value<int>()->default_value("4096"))
-    ("b,ldb", "Leading dimension of B", cxxopts::value<int>()->default_value("4096"))
-    ("c,ldc", "Leading dimension of C", cxxopts::value<int>()->default_value("4096"))
+    ("a,lda", "Leading dimension of A", cxxopts::value<int>()->default_value("-1"))
+    ("b,ldb", "Leading dimension of B", cxxopts::value<int>()->default_value("-1"))
+    ("c,ldc", "Leading dimension of C", cxxopts::value<int>()->default_value("-1"))
     ("m,groupM", "Groups alone M dimention to launch", cxxopts::value<size_t>()->default_value("8"))
     ("n,groupN", "Groups alone N dimention to launch", cxxopts::value<size_t>()->default_value("8"))
     ("l,subGroupM", "Sub-Groups alone M dimention to launch", cxxopts::value<size_t>()->default_value("8"))
@@ -244,6 +260,10 @@ int main(int argc, char *argv[]) {
   auto lda = parsed_opts["lda"].as<int>();
   auto ldb = parsed_opts["ldb"].as<int>();
   auto ldc = parsed_opts["ldc"].as<int>();
+
+  if (lda < 0) lda = K;
+  if (ldb < 0) ldb = N;
+  if (ldc < 0) ldc = N;
 
   auto nGroupM = parsed_opts["m"].as<size_t>();
   auto nGroupN = parsed_opts["n"].as<size_t>();
@@ -294,7 +314,9 @@ int main(int argc, char *argv[]) {
 
   queue.memcpy(C_host, C, sizeof(testType) * M * N).wait();
   verifyGemm(C_host, A_host, B_host, M, N, K, lda, ldb, ldc);
+#if defined(DEBUG)
   dumpMatrix(C_host, M, N, ldc);
+#endif
 
   constexpr const int iter = 20;
   float durations = 0.f;
