@@ -149,10 +149,29 @@ struct AddressPayload {
     return *this;
   }
 
+  // Should be optimized by IGC
+  template <int offset>
+  inline AddressPayload& addSrc0AddrX() {
+    asm volatile (
+        "add (M1, 1) %0(0, 5)<1> %0(0, 5)<0;1,0> %1\n"
+        : "+rw"(payloadReg_) : "i"(offset)
+    );
+    return *this;
+  }
+
   inline AddressPayload& addSrc0AddrY(int offset) {
     asm volatile (
         "add (M1, 1) %0(0, 6)<1> %0(0, 6)<0;1,0> %1(0,0)<0;1,0>\n"
         : "+rw"(payloadReg_) : "rw"(offset)
+    );
+    return *this;
+  }
+
+  template <int offset>
+  inline AddressPayload& addSrc0AddrY() {
+    asm volatile (
+        "add (M1, 1) %0(0, 6)<1> %0(0, 6)<0;1,0> %1\n"
+        : "+rw"(payloadReg_) : "i"(offset)
     );
     return *this;
   }
