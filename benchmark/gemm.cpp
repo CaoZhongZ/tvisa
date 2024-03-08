@@ -82,10 +82,10 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
     memset(&C_13, 0, sizeof(mTC));
 
     for (int k = 0; k < K; k += kElems) {
-      B_0.load(addressB_0);
-      B_1.load(addressB_1);
-      A_0.load(addressA_0);
-      A_1.load(addressA_1);
+      B_0.template load<CacheCtrl::L1C_L3C>(addressB_0);
+      B_1.template load<CacheCtrl::L1C_L3C>(addressB_1);
+      A_0.template load<CacheCtrl::L1C_L3C>(addressA_0);
+      A_1.template load<CacheCtrl::L1C_L3C>(addressA_1);
       addressPrefetch_B.prefetch<T, SubGroupSize, CacheCtrl::L1C_L3C>();
       addressPrefetch_A.prefetch<T, SubGroupSize, CacheCtrl::L1C_L3C>();
 
@@ -244,8 +244,8 @@ int main(int argc, char *argv[]) {
     ("a,lda", "Leading dimension of A", cxxopts::value<int>()->default_value("-1"))
     ("b,ldb", "Leading dimension of B", cxxopts::value<int>()->default_value("-1"))
     ("c,ldc", "Leading dimension of C", cxxopts::value<int>()->default_value("-1"))
-    ("m,groupM", "Groups alone M dimention to launch", cxxopts::value<size_t>()->default_value("16"))
-    ("n,groupN", "Groups alone N dimention to launch", cxxopts::value<size_t>()->default_value("16"))
+    ("m,groupM", "Groups alone M dimention to launch", cxxopts::value<size_t>()->default_value("8"))
+    ("n,groupN", "Groups alone N dimention to launch", cxxopts::value<size_t>()->default_value("8"))
     ("l,subGroupM", "Sub-Groups alone M dimention to launch", cxxopts::value<size_t>()->default_value("8"))
     ("w,subGroupN", "Sub-Groups alone N dimention to launch", cxxopts::value<size_t>()->default_value("4"))
     ;
