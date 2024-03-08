@@ -78,6 +78,20 @@ struct AddressPayload {
     );
   }
 
+  // Be careful of y/x other than x/y
+  static AddressPayload create2DAddress(
+      const void* const SurfaceBase,
+      uint32_t SurfaceHeight,
+      uint32_t SurfaceWidth,
+      uint32_t SurfacePitch,
+      int Src0AddrY, int Src0AddrX
+  ) {
+    return AddressPayload(
+        SurfaceBase, SurfaceHeight, SurfaceWidth,
+        SurfacePitch, Src0AddrX, Src0AddrY
+    );
+  }
+
   template <int OldHeight, int OldWidth, int OldArrayLength>
   inline AddressPayload(
       const AddressPayload<OldHeight, OldWidth, OldArrayLength>& payload) :
