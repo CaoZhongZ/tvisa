@@ -45,8 +45,8 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
     AddressPayload<32, 16/4> addressPrefetch_A(addressA_0);
     AddressPayload<16, 64/8> addressPrefetch_B(addressB_0);
 
-    addressA_1.addSrc0AddrY(mElems);
-    addressB_1.addSrc0AddrX(nElems);
+    addressA_1.addSrc0AddrY<mElems>();
+    addressB_1.addSrc0AddrX<nElems>();
 
     // Initial slab position
     addressPrefetch_A.addSrc0AddrX(sg_X * 16/4);
@@ -56,8 +56,8 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
       addressPrefetch_A.prefetch<T, SubGroupSize>();
       addressPrefetch_B.prefetch<T, SubGroupSize>();
 
-      addressPrefetch_A.addSrc0AddrX(kElems);
-      addressPrefetch_B.addSrc0AddrY(kElems);
+      addressPrefetch_A.addSrc0AddrX<kElems>();
+      addressPrefetch_B.addSrc0AddrY<kElems>();
     }
 
     using mTA = __RawMatrix<T, 16, 16, DataShuffle::none, SubGroupSize>;
@@ -88,9 +88,9 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
       addressPrefetch_B.prefetch<T, SubGroupSize>();
       addressPrefetch_A.prefetch<T, SubGroupSize>();
 
-      addressB_0.addSrc0AddrY(kElems);
-      addressB_1.addSrc0AddrY(kElems);
-      addressA_0.addSrc0AddrX(kElems);
+      addressB_0.addSrc0AddrY<kElems>();
+      addressB_1.addSrc0AddrY<kElems>();
+      addressA_0.addSrc0AddrX<kElems>();
 
       swFence();
       dpas<SubGroupSize>(C_00, A_0, B_0.template subArrayView<0>());
@@ -106,9 +106,9 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
       dpas<SubGroupSize>(C_13, A_1, B_1.template subArrayView<1>());
       swFence();
 
-      addressA_1.addSrc0AddrX(kElems);
-      addressPrefetch_B.addSrc0AddrY(kElems);
-      addressPrefetch_A.addSrc0AddrX(kElems);
+      addressA_1.addSrc0AddrX<kElems>();
+      addressPrefetch_B.addSrc0AddrY<kElems>();
+      addressPrefetch_A.addSrc0AddrX<kElems>();
    }
 
     AddressPayload<8, 32> address_C(
