@@ -42,19 +42,20 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
     AddressPayload<16, 16, 2> addressB_1(addressB_0);
 
     // Balance prefetch among sub-groups
-    AddressPayload<32, 16/4> addressPrefetch_A(addressA_0);
-    AddressPayload<16, 64/8> addressPrefetch_B(addressB_0);
+    AddressPayload<32/4, 16> addressPrefetch_A(addressA_0);
+    AddressPayload<16/4, 64/2> addressPrefetch_B(addressB_0);
 
     addressA_1.addSrc0AddrY(mElems);
     addressB_1.addSrc0AddrX(nElems);
 
     // Initial slab position
-    addressPrefetch_A.addSrc0AddrX(sg_X * 16/4);
-    addressPrefetch_B.addSrc0AddrX(sg_Y * 64/8);
+    addressPrefetch_A.addSrc0AddrY(sg_X * 32/4);
+    addressPrefetch_B.addSrc0AddrX((sg_Y % 2) * 64/2);
+    addressPrefetch_B.addSrc0AddrY((sg_Y / 2) * 16/4);
 
     for (int i = 0; i < 3; ++ i) {
-      addressPrefetch_A.prefetch<T, SubGroupSize>();
-      addressPrefetch_B.prefetch<T, SubGroupSize>();
+      addressPrefetch_A.prefetch<T, SubGroupSize, CacheCtrl::L1C_L3C>();
+      addressPrefetch_B.prefetch<T, SubGroupSize, CacheCtrl::L1C_L3C>();
 
       addressPrefetch_A.addSrc0AddrX(kElems);
       addressPrefetch_B.addSrc0AddrY(kElems);
@@ -85,8 +86,8 @@ template <typename T, int SubGroupSize = 16> struct gemmKernel {
       B_1.load(addressB_1);
       A_0.load(addressA_0);
       A_1.load(addressA_1);
-      addressPrefetch_B.prefetch<T, SubGroupSize>();
-      addressPrefetch_A.prefetch<T, SubGroupSize>();
+      addressPrefetch_B.prefetch<T, SubGroupSize, CacheCtrl::L1C_L3C>();
+      addressPrefetch_A.prefetch<T, SubGroupSize, CacheCtrl::L1C_L3C>();
 
       addressB_0.addSrc0AddrY(kElems);
       addressB_1.addSrc0AddrY(kElems);
@@ -243,8 +244,8 @@ int main(int argc, char *argv[]) {
     ("a,lda", "Leading dimension of A", cxxopts::value<int>()->default_value("-1"))
     ("b,ldb", "Leading dimension of B", cxxopts::value<int>()->default_value("-1"))
     ("c,ldc", "Leading dimension of C", cxxopts::value<int>()->default_value("-1"))
-    ("m,groupM", "Groups alone M dimention to launch", cxxopts::value<size_t>()->default_value("8"))
-    ("n,groupN", "Groups alone N dimention to launch", cxxopts::value<size_t>()->default_value("8"))
+    ("m,groupM", "Groups alone M dimention to launch", cxxopts::value<size_t>()->default_value("16"))
+    ("n,groupN", "Groups alone N dimention to launch", cxxopts::value<size_t>()->default_value("16"))
     ("l,subGroupM", "Sub-Groups alone M dimention to launch", cxxopts::value<size_t>()->default_value("8"))
     ("w,subGroupN", "Sub-Groups alone N dimention to launch", cxxopts::value<size_t>()->default_value("4"))
     ;
