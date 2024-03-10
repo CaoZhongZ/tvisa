@@ -174,7 +174,10 @@ struct AddressPayload {
     return *this;
   }
 
-  template <typename T, int SubGroupSize = 16, CacheCtrl CTL = CacheCtrl::DEFAULT>
+  template <
+    typename T,
+    int SubGroupSize = 16,
+    CacheCtrl CTL = CacheCtrl::DEFAULT>
   inline void prefetch() const;
 
 private:
@@ -695,6 +698,13 @@ template <
     const __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, 1>& M_0,
     const __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, 1>& M_1
   );
+  static inline __ArrayMatrix<
+    T, Height, Width * 2, Transpose, SubGroupSize, 1
+  > run(
+    const __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, 2>& M_0,
+  ) {
+    return run(M_0.subArrayView<0>(), M_0.subArrayView<1>());
+  }
 };
 
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
