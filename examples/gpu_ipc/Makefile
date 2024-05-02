@@ -13,7 +13,7 @@ SYCLFLAGS=-fsycl -fsycl-targets=spir64_gen -Xsycl-target-backend=spir64_gen "-de
 # INCLUDES=-I$(CCL_ROOT)/include
 # LIBRARIES=-L$(CCL_ROOT)/lib -lmpi -lze_loader
 
-INCLUDES=-I../../include
+INCLUDES=-I../../include -I../..
 LIBRARIES=-lmpi -lze_loader
 
 CXXFLAGS=-std=c++17 -fopenmp $(SYCLFLAGS) $(OPT) $(VERBOSE) -Wall -Wno-vla-cxx-extension $(INCLUDES) $(LIBRARIES)
