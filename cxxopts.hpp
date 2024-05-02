@@ -1,3 +1,7 @@
+//
+// Copyright (C) 2024 Intel Corporation
+// SPDX-License-Identifier: MIT
+//
 /*
 
 Copyright (c) 2014, 2015, 2016, 2017 Jarryd Beck

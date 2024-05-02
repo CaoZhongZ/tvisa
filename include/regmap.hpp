@@ -1,3 +1,7 @@
+//
+// Copyright (C) 2024 Intel Corporation
+// SPDX-License-Identifier: MIT
+//
 #pragma once
 
 #include "CL/cl_platform.h"

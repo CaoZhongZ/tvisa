@@ -1,3 +1,7 @@
+//
+// Copyright (C) 2024 Intel Corporation
+// SPDX-License-Identifier: MIT
+//
 #pragma once
 
 // sub-group level parallel transmit, minimum latency expected

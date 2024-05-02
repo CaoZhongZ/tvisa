@@ -1,3 +1,7 @@
+//
+// Copyright (C) 2024 Intel Corporation
+// SPDX-License-Identifier: MIT
+//
 #pragma once
 
 template <typename T, int SubGroupSize> struct Rt64_128 {

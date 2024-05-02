@@ -1,3 +1,7 @@
+//
+// Copyright (C) 2024 Intel Corporation
+// SPDX-License-Identifier: MIT
+//
 #pragma once
 
 template <typename T, typename message_t, typename AccumT>
