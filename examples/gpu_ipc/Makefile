@@ -1,7 +1,7 @@
 CC=clang
 CXX=clang++
 
-OPT=-O3 -fno-strict-aliasing
+OPT=-O3 -fno-strict-aliasing -fstack-protector-strong -fvisibility=hidden -flto
 # OPT=-g -fno-strict-aliasing
 # VERBOSE=-D__enable_sycl_stream__
 
@@ -16,7 +16,7 @@ SYCLFLAGS=-fsycl -fsycl-targets=spir64_gen -Xsycl-target-backend=spir64_gen "-de
 INCLUDES=-I../../include -I../..
 LIBRARIES=-lmpi -lze_loader
 
-CXXFLAGS=-std=c++17 -fopenmp $(SYCLFLAGS) $(OPT) $(VERBOSE) -Wall -Wno-vla-cxx-extension $(INCLUDES) $(LIBRARIES)
+CXXFLAGS=-std=c++17 -fPIC -fopenmp -fsanitize=cfi -Wformat-security -z noexecstack $(SYCLFLAGS) $(OPT) $(VERBOSE) -Wall -Wextra -Werror -Wno-vla-cxx-extension $(INCLUDES) $(LIBRARIES) -pie -Wl,-z,relro,-z,now
 
 main : ipc_exchange.cpp sycl_misc.cpp allreduce.cpp main.cpp
 

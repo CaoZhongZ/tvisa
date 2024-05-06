@@ -1,6 +1,6 @@
 CC=clang
 CXX=clang++
-OPT_FLAGS=-O3 -ffast-math
+OPT_FLAGS=-O3 -ffast-math -fstack-protector-strong
 
 ENABLE_AOT=pvc
 
@@ -27,9 +27,9 @@ OFFLOAD=sycl-spir64_gen-unknown-unknown
 endif
 
 V=
-CXXFLAGS=-std=c++17 $(OPT_FLAGS) -Wall -Wno-deprecated-declarations -Wno-unused-variable -Wno-vla-cxx-extension -I../include -I..
+CXXFLAGS=-std=c++17 -fPIC -fpie -Wall -Wextra -Werror $(OPT_FLAGS) -Wno-deprecated-declarations -Wno-unused-variable -Wno-vla-cxx-extension -I../include -I.. -Wformat-security -flto -fsanitize=cfi -fvisibility=hidden -z noexecstack -D_FORTIFY_SOURCE=2
 SYCLFLAGS=-fsycl -fsycl-id-queries-fit-in-int -fsycl-default-sub-group-size=16 -D__SYCL_INTERNAL_API -fsycl-targets=$(TARGET)
-LINKFLAGS=$(OPT_FLAGS) -fsycl -lblas -fsycl-max-parallel-link-jobs=1 -fsycl-targets=$(TARGET) $(LINKTARGET)
+LINKFLAGS=$(OPT_FLAGS) -Wl,-z,relro,-z,now -fsycl -lblas -fsycl-max-parallel-link-jobs=1 -fsycl-targets=$(TARGET) $(LINKTARGET)
 
 .PRECIOUS : %-xe.o %.host.o %.dev.bc %.footer.hpp
 
