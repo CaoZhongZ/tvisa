@@ -157,7 +157,7 @@ struct AddressPayload {
 
   inline AddressPayload cloneAndUpdateSurfaceBase(void *addr) {
     AddressPayload newPayload (*this);
-    return newPayload.upddateSurfaceBase(addr);
+    return newPayload.updateSurfaceBase(addr);
   }
 
   inline AddressPayload& updateSrc0AddrX(int x_off) {
