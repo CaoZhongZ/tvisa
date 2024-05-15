@@ -734,9 +734,9 @@ template <
   static inline __ArrayMatrix<
     T, Height, Width * 2, Transpose, SubGroupSize, 1
   > run(
-    const __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, 2>& M_0,
+    const __ArrayMatrix<T, Height, Width, Transpose, SubGroupSize, 2>& M_0
   ) {
-    return run(M_0.subArrayView<0>(), M_0.subArrayView<1>());
+    return run(M_0.template subArrayView<0>(), M_0.template subArrayView<1>());
   }
 };
 
