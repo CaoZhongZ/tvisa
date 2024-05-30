@@ -18,7 +18,10 @@ LIBRARIES=-lmpi -lze_loader
 
 CXXFLAGS=-std=c++17 -fPIC -fopenmp -fsanitize=cfi -Wformat-security -z noexecstack $(SYCLFLAGS) $(OPT) $(VERBOSE) -Wall -Wextra -Werror -Wno-vla-cxx-extension $(INCLUDES) $(LIBRARIES) -pie -Wl,-z,relro,-z,now
 
-main : ipc_exchange.cpp sycl_misc.cpp allreduce.cpp main.cpp
+cxxopts.hpp:
+	curl -L https://raw.githubusercontent.com/jarro2783/cxxopts/master/include/cxxopts.hpp > $@
+
+main : ipc_exchange.cpp sycl_misc.cpp allreduce.cpp main.cpp cxxopts.hpp
 
 all : main
 

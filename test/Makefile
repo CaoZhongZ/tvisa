@@ -86,7 +86,10 @@ test_execs=good_2d_load_store lsc_uncache_32_and_16 test_2dblock_matrix \
 					 test_packRegPayload broken_2d_load_store lsc_64to32x2_notrans test_2dblock_fp16 \
 					 test_packRegPayloadClass unit_test
 
-good_2d_load_store : good_2d_load_store.o ../sycl_misc.o
+cxxopts.hpp:
+	curl -L https://raw.githubusercontent.com/jarro2783/cxxopts/master/include/cxxopts.hpp > $@
+
+good_2d_load_store : good_2d_load_store.o ../sycl_misc.o cxxopts.hpp
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
 lsc_uncache_32_and_16 : lsc_uncache_32_and_16.o ../sycl_misc.o

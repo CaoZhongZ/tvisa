@@ -83,7 +83,10 @@ spirv_ext=-all,+SPV_EXT_shader_atomic_float_add,+SPV_EXT_shader_atomic_float_min
 
 test_execs=benchmark_2d_load benchmark_mma dpas gemm
 
-benchmark_2d_load: benchmark_2d_load.o 	../sycl_misc.o
+cxxopts.hpp:
+	curl -L https://raw.githubusercontent.com/jarro2783/cxxopts/master/include/cxxopts.hpp > $@
+
+benchmark_2d_load: benchmark_2d_load.o 	../sycl_misc.o cxxopts.hpp
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^	
 
 benchmark_mma: benchmark_mma.o ../sycl_misc.o
