@@ -1,6 +1,7 @@
 #include <iostream>
 #include <sycl/sycl.hpp>
 
+#include "utils.hpp"
 #include "cxxopts.hpp"
 #include "sycl_misc.hpp"
 #include "gen_visa_templates.hpp"

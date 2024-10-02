@@ -1,7 +1,7 @@
 #include <csignal>
 #include <iostream>
 #include <sycl/sycl.hpp>
-
+#include "utils.hpp"
 #include "cxxopts.hpp"
 #include "gen_visa_templates.hpp"
 #include "lsc.hpp"
@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
   queue.fill<InT>(dst, 1, nelems);
 
   int tensorH = surfaceH;
-  constexpr int tensorW = 32; // bytes
+  constexpr int tensorW = 16; // bytes
   constexpr int tensorP = tensorW;
   constexpr int ROW = 32;
   constexpr int COL = tensorW / sizeof(InT);

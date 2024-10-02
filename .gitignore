@@ -1,3 +1,5 @@
+.cache/
+build/
 *.bc
 *.footer.hpp
 *.header.hpp
