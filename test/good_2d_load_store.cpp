@@ -1,11 +1,11 @@
-#include <csignal>
-#include <iostream>
-#include <sycl/sycl.hpp>
-#include "utils.hpp"
 #include "cxxopts.hpp"
 #include "gen_visa_templates.hpp"
 #include "lsc.hpp"
 #include "sycl_misc.hpp"
+#include "utils.hpp"
+#include <csignal>
+#include <iostream>
+#include <sycl/sycl.hpp>
 
 #define SG_SZ 16
 
@@ -79,7 +79,7 @@ private:
   int surfaceP;
 };
 
-template <int Height, int Width, typename T> struct vnni_test {
+template <int BlockM, int BlockN, typename T> struct vnni_test {
   vnni_test(T *dst, T *src, int surfaceH, int surfaceW, int surfaceP)
       : src(src), dst(dst), surfaceH(surfaceH), surfaceW(surfaceW),
         surfaceP(surfaceP) {}
@@ -89,31 +89,25 @@ template <int Height, int Width, typename T> struct vnni_test {
     auto index = item.get_global_linear_id();
 #if defined(__SYCL_DEVICE_ONLY__)
     int x_off = 0;
-    int y_off = index / SG_SZ * Height;
+    int y_off = 0;
 
-    __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> tmp0;
-    AddressPayload<Height, Width> address_payload_0(
-        (void *)src, surfaceH, surfaceW, surfaceP, x_off, y_off);
+    __ArrayMatrix<T, BlockN, BlockM, DataShuffle::none, SG_SZ> tmp0;
+    AddressPayload<BlockN, BlockM> address_payload_0(
+        (void *)src, 
+        surfaceH, 
+        surfaceW * sizeof(T), 
+        surfaceP * sizeof(T), 
+        x_off, y_off);
     lscLoad<CacheCtrl::L1UC_L3UC>(tmp0, address_payload_0);
 
-    __Matrix<T, Height, Width, DataShuffle::none, SG_SZ> ret;
-    sycl::vec<T, __Matrix<T, Height, Width, DataShuffle::none, SG_SZ>::N>
-        image = tmp0.getImage();
-    ret.getImage() = image;
-
-    if (index == 0) {
-      constexpr int N = __Matrix<T, Height, Width, DataShuffle::none, SG_SZ>::N;
-      for (int i = 0; i < N; ++i) {
-        sycl::ext::oneapi::experimental::printf(fmt, float(image[i]));
-      }
-      sycl::ext::oneapi::experimental::printf(fmt_end);
-    }
-
-    AddressPayload<Height, Width> address_payload_1(
-        (void *)dst, surfaceH, surfaceW, surfaceP, x_off, y_off);
-    lscStore<CacheCtrl::L1WB_L3WB>(address_payload_1, ret);
+    AddressPayload<BlockN, BlockM> address_payload_1(
+        (void *)dst, 
+        surfaceH, 
+        surfaceW * sizeof(T), 
+        surfaceP * sizeof(T), x_off, y_off);
+    lscStore<CacheCtrl::L1WB_L3WB>(address_payload_1, tmp0);
 #else
-    dst[index] += src[index];
+    dst[index] = src[index];
 #endif
   }
 
@@ -140,10 +134,10 @@ int main(int argc, char *argv[]) {
   auto parsed_opts = opts.parse(argc, argv);
   auto sz_string = parsed_opts["size"].as<std::string>();
 
-  auto alloc_size = parse_nelems(sz_string);
   auto surfaceH = parsed_opts["height"].as<int>();
   auto surfaceW = parsed_opts["width"].as<int>();
   auto surfaceP = parsed_opts["pitch"].as<int>();
+  auto alloc_size = surfaceH * surfaceP * sizeof(sycl::half);
 
   sycl::queue queue(
       sycl::gpu_selector_v,
@@ -174,10 +168,8 @@ int main(int argc, char *argv[]) {
   int tensorH = surfaceH;
   constexpr int tensorW = 16; // bytes
   constexpr int tensorP = tensorW;
-  constexpr int ROW = 32;
-  constexpr int COL = tensorW / sizeof(InT);
-  auto block_sz = ROW * COL * sizeof(InT);
-  auto blocks = (alloc_size + block_sz - 1) / block_sz;
+  constexpr int BlockM = 16;
+  constexpr int BlockN = 16;
 
   //  ------------SG_SZ * 4-byte--------------
   //  |                                      |
@@ -185,30 +177,22 @@ int main(int argc, char *argv[]) {
   //  |                                      |
   //  ----------------------------------------
 
-  std::cout << "Num. of block: " << blocks << std::endl;
   queue.submit([&](sycl::handler &h) {
-    h.parallel_for(sycl::nd_range<1>{blocks * SG_SZ, SG_SZ},
-                   vnni_test<ROW, COL, InT>(reinterpret_cast<InT *>(dst),
-                                            reinterpret_cast<InT *>(src),
-                                            tensorH, tensorW, tensorP));
+    h.parallel_for(sycl::nd_range<1>{SG_SZ, SG_SZ},
+                   vnni_test<BlockM, BlockN, InT>(reinterpret_cast<InT *>(dst),
+                                                  reinterpret_cast<InT *>(src),
+                                                  surfaceH, surfaceW,
+                                                  surfaceP));
   });
 
   queue.memcpy(b_check, dst, alloc_size);
   queue.wait();
 
   std::cout << "----------------------------------" << std::endl;
-
-  for (int k = 0; k < ROW; ++k) {
-    for (int i = 0; i < COL; ++i)
-      std::cout << ((InT *)b_check)[k * tensorP / sizeof(InT) + i] << ", ";
+  for (int k = 0; k < BlockN; ++k) {
+    for (int i = 0; i < BlockM; ++i)
+      std::cout << ((InT *)b_check)[k * surfaceP + i] << ", ";
     std::cout << std::endl;
   }
-
   std::cout << "----------------------------------" << std::endl;
-
-  for (int k = ROW; k < ROW * 2; ++k) {
-    for (int i = 0; i < COL; ++i)
-      std::cout << ((InT *)b_check)[k * tensorP / sizeof(InT) + i] << ", ";
-    std::cout << std::endl;
-  }
 }
