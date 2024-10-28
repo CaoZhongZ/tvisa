@@ -149,7 +149,7 @@ def generate_lsc_untyped(filename, op):
                     actual_vec = actual_size // 8
                     actual_size = 8
 
-                for sg_sz in [16, 32]:
+                for sg_sz in [8, 16, 32]:
                     for cache in cachectrl:
                         func_str = f"{op}({data_size}, {vec_size}, {sg_sz}, CacheCtrl::{cache.name}, {cache.value}, {datamap[actual_size]}{vecmap[actual_vec]});\n"
                         file.write(func_str)
