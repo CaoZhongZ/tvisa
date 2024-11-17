@@ -232,6 +232,22 @@ struct BarrierPayload {
         : "=rw"(payloadReg_) : "rw"(payload));
   }
 
+  BarrierPayload(
+      uint8_t ID,
+      bool ATOB,
+      BarrierType type,
+      uint8_t NumOfProducer,
+      uint8_t NumOfConsumer) {
+    uint32_t payload = ID | ATOB << 8
+      | ((uint32_t)type) << 14
+      | ((uint32_t)NumOfProducer) << 16
+      | ((uint32_t)NumOfConsumer) << 24;
+
+    asm volatile ("\n"
+        "mov (M1, 1) %0(0,2)<1> %1(0,0)<0;1,0>\n"
+        : "=rw"(payloadReg_) : "rw"(payload));
+  }
+
   inline uint32_t& getPayload() {
     return payloadReg_;
   }
