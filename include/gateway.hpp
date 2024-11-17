@@ -39,11 +39,12 @@ static inline void nbarrier_signal(const BarrierPayload& Barrier) {
       :: "rw"(Barrier.getPayload()));
 }
 
-static inline void atob_barrier(int n_threads) {
-  BarrierPayload barrier (0, true, 0, n_threads, n_threads);
+static inline void atob_barrier(uint8_t n_threads) {
+  BarrierPayload barrier (0, true, BarrierType::ProducerConsumer, n_threads, n_threads);
   asm volatile (
       "raw_sends.3.1.0.0 (M1, 1) 0x0:ud 0x02000804:ud %0.0 V0.0 V0.0\n"
       :: "rw"(barrier.getPayload()));
+  asm volatile ("nbarrier.wait 0:ub");
 }
 
 static inline void sbarrier_wait() {

@@ -2,7 +2,7 @@ CC=clang
 CXX=clang++
 OPT_FLAGS=-g -O3 -ffast-math
 
-ENABLE_AOT=pvc
+ENABLE_AOT=bmg-g21-a0
 
 SYCL_LIB=$(shell clang++ -print-file-name=libsycl.so)
 SYCL_ROOT=$(realpath $(dir $(SYCL_LIB)))
@@ -84,7 +84,7 @@ spirv_ext=-all,+SPV_EXT_shader_atomic_float_add,+SPV_EXT_shader_atomic_float_min
 test_execs=good_2d_load_store lsc_uncache_32_and_16 test_2dblock_matrix \
 					 unit_dpas_addresspayloads barrier_test lsc_2d_1024_load_store test_2d_accum_visa \
 					 test_packRegPayload broken_2d_load_store lsc_64to32x2_notrans test_2dblock_fp16 \
-					 test_packRegPayloadClass unit_test
+					 test_packRegPayloadClass unit_test early_bailout
 
 good_2d_load_store : good_2d_load_store.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
@@ -93,6 +93,9 @@ lsc_uncache_32_and_16 : lsc_uncache_32_and_16.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
 benchmark_mma : benchmark_mma.o ../sycl_misc.o
+	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
+
+early_bailout : early_bailout.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
 unit_dpas_addresspayloads : unit_dpas_addresspayloads.o ../sycl_misc.o

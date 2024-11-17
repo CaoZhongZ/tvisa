@@ -43,7 +43,7 @@ struct barrier_test {
     if (id >= bound)
       return;
 
-    auto n_threads = item.get_sub_group().get_group_range();
+    auto n_threads = item.get_sub_group().get_group_range()[0];
     
 #if defined(__SYCL_DEVICE_ONLY__)
     atob_barrier(n_threads);
