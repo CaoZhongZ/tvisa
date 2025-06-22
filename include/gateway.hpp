@@ -9,7 +9,7 @@
 // Use OpenCL named barrier initialization to trigger compiler
 // allocate named barrier.
 //
-extern SYCL_EXTERNAL void named_barrier_init(int count);
+extern SYCL_EXTERNAL void named_barrier_init(int id);
 
 template <int N> void named_barrier_init() {
   if constexpr (N -1 > 0)

@@ -104,6 +104,9 @@ unit_dpas_addresspayloads : unit_dpas_addresspayloads.o ../sycl_misc.o
 unit_test : unit_test.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
+test_dump_state : test_dump_state.o ../sycl_misc.o
+	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
+
 all : $(test_execs)
 
 clean :
