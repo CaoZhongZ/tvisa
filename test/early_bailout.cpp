@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
     ("s,subgroup", "Number of subgroup",
      cxxopts::value<size_t>()->default_value("16"))
     ("b,bound", "Boundary from where everybody bailout",
-     cxxopts::value<size_t>()->default_value("4"))
+     cxxopts::value<size_t>()->default_value("128"))
     ;
 
   auto parsed_opts = opts.parse(argc, argv);

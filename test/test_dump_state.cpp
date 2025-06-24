@@ -13,8 +13,13 @@ struct dump_sr {
 #if defined(__SYCL_DEVICE_ONLY__)
     auto lid = item.get_local_id()[0];
     auto group_id =  item.get_group().get_group_id()[0];
-    if (lid < 4)
-      sink[group_id][lid] = dumpSR();
+    auto sr = dumpSR();
+    if (lid < 4) {
+      sink[group_id][lid] = sr;
+      sycl::ext::oneapi::experimental::printf("%d@%d:%#x\n", lid, group_id, sr);
+    }
+
+    sycl::group_barrier(item.get_group());
 #endif
   }
 
