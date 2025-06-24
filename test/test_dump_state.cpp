@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
     <<n_group * n_subgroup * 16<<", "
     <<n_subgroup * 16<<")"<<std::endl;
 
-  auto sink_sz = n_group * sizeof(uint32_t) * 4;
+  auto sink_sz = n_group * sizeof(uint32_t) * 4 * 16;
   auto sink = (char *)sycl::malloc_device(sink_sz, queue);
   auto h_sink = (char *)sycl::malloc_host(sink_sz, queue);
 
@@ -67,6 +67,6 @@ int main(int argc, char *argv[]) {
     });
   }
 
-  queue.copy(h_sink, sink, sink_sz);
+  queue.memcpy(h_sink, sink, sink_sz);
   queue.wait();
 }
