@@ -15,13 +15,13 @@ struct dump_sr {
     auto lid = sub_group.get_local_id()[0];
     auto sub_id = sub_group.get_group_id()[0];
     auto group_id =  item.get_group().get_group_id()[0];
-    auto sr = dumpSR();
+    auto ce = dumpCE();
 
     auto sub_sz = sub_group.get_group_range()[0];
-    auto _sink = reinterpret_cast<uint32_t (*)[sub_sz][4]>(sink);
-    if (lid < 4) {
-      _sink[group_id][sub_id][lid] = sr;
-      // sycl::ext::oneapi::experimental::printf("%d@%d:%#x\n", lid, group_id, sr);
+    auto _sink = reinterpret_cast<uint32_t (*)[sub_sz]>(sink);
+    if (lid < 1) {
+      _sink[group_id][sub_id] = ce;
+      // sycl::ext::oneapi::experimental::printf("%d@%d:%#x\n", lid, group_id, ce);
     }
 
     sycl::group_barrier(item.get_group());
@@ -30,18 +30,6 @@ struct dump_sr {
 
   void *sink;
 };
-
-void parseSR(int index, uint32_t sr_value) {
-  switch(index) {
-  case 0:
-    sr0_0 sr;
-    sr.raw = sr_value;
-    printf("tid:%d, euid:%d, subsliceid:%d, sliceid:%d\n", sr.tid, sr.euid, sr.subsliceid, sr.sliceid);
-    break;
-  default:
-    break;
-  }
-}
 
 int main(int argc, char *argv[]) {
   cxxopts::Options opts("DumpSR", "Dump launching mapping");
@@ -66,7 +54,7 @@ int main(int argc, char *argv[]) {
     <<n_group * n_subgroup * 16<<", "
     <<n_subgroup * 16<<")"<<std::endl;
 
-  auto sink_sz = n_group * n_subgroup * sizeof(uint32_t) * 4;
+  auto sink_sz = n_group * n_subgroup * sizeof(uint32_t);
   auto sink = sycl::malloc_device(sink_sz, queue);
   auto h_sink = sycl::malloc_host(sink_sz, queue);
 
@@ -87,12 +75,9 @@ int main(int argc, char *argv[]) {
   queue.memcpy(h_sink, sink, sink_sz);
   queue.wait();
 
-  auto _h_sink = reinterpret_cast<uint32_t (*)[n_subgroup][4]>(h_sink);
+  auto _h_sink = reinterpret_cast<uint32_t (*)[n_subgroup]>(h_sink);
 
-  for (size_t i = 0; i < n_group; ++ i) {
-    for (size_t j = 0; j < n_subgroup; ++ j) {
-      printf("%lu,%lu:", i, j);
-      parseSR(0, _h_sink[i][j][0]);
-    }
-  }
+  for (size_t i = 0; i < n_group; ++ i)
+    for (size_t j = 0; j < n_subgroup; ++ j)
+      printf("%lu,%lu:%#x\n", i, j, _h_sink[i][j]);
 }
