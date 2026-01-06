@@ -15,7 +15,7 @@ struct dump_sr {
     auto lid = sub_group.get_local_id()[0];
     auto sub_id = sub_group.get_group_id()[0];
     auto group_id =  item.get_group().get_group_id()[0];
-    auto ce = dumpCE();
+    auto ce = (lid % 2 == 0) ? dumpCE() : 0;
 
     auto sub_sz = sub_group.get_group_range()[0];
     auto _sink = reinterpret_cast<uint32_t (*)[sub_sz]>(sink);
