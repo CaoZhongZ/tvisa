@@ -95,8 +95,10 @@ static void verifyGemm (
 
   std::vector<float> expected(M * N, 0);
 
+  // a/b are packed tightly above (leading dims K and N), so pass those to BLAS
+  // rather than the device-side lda/ldb, which only stride the source reads.
   cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f,
-              a.data(), lda, b.data(), ldb, 0, expected.data(), ldc);
+              a.data(), K, b.data(), N, 0, expected.data(), N);
 
   bool res = allClose(actual_result, ldc, expected.data(), N, M, N);
   if (res)

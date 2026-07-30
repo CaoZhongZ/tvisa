@@ -273,8 +273,6 @@ int main(int argc, char *argv[]) {
 
   sycl::queue queue = currentQueue(0, 0);
 
-  auto elemsA = M * K;
-
   testType *A_host, *A, *B_host, *B, *C_host, *C;
 
   std::tie(A_host, A) = allocDeviceAndInitAsync<testType>(
@@ -335,7 +333,7 @@ int main(int argc, char *argv[]) {
 
   durations /= iter;
 
-  float ops = size_t(M) * K * N * 2;
-  float Tflops = ops / 1e3 / durations;
+  double ops = double(size_t(M) * K * N * 2);
+  double Tflops = ops / 1e3 / durations;
   printf("M: %d, N: %d, K: %d, time: %f us, TFlops: %f\n", M, N, K, durations / 1e3, Tflops);
 }
