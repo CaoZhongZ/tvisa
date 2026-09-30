@@ -25,6 +25,18 @@ struct RawSendStore32_32 {
 
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 
+#if defined(__SYCL_TARGET_INTEL_GPU_CRI__)
+#define EnumerateLoads(DataWidth, DestRegNumber, DataShuffle, CacheCtrl, DescStr) \
+  template <> \
+  struct RawSendLoad<DataWidth, DestRegNumber, DataShuffle, CacheCtrl> {  \
+    template <typename T, typename AddressPayload> \
+    static inline void run(T& target, const AddressPayload& address) { \
+      asm volatile ("\n"  \
+          "raw_sendg.0xF (M1, 1) %0.0/" str((DestRegNumber * 64)) " %1.0/64 V0.0/0 0x0:uq 0x0:uq " str(DescStr) "\n"  \
+        : "=rw"(target) : "rw"(address.getPayload()));  \
+    } \
+  };
+#else
 #define EnumerateLoads(DataWidth, DestRegNumber, DataShuffle, CacheCtrl, DescStr) \
   template <> \
   struct RawSendLoad<DataWidth, DestRegNumber, DataShuffle, CacheCtrl> {  \
@@ -35,9 +47,22 @@ struct RawSendStore32_32 {
         : "=rw"(target) : "rw"(address.getPayload()));  \
     } \
   };
+#endif
 
 #include "list_raw_loads.list"
 
+#if defined(__SYCL_TARGET_INTEL_GPU_CRI__)
+#define EnumerateStores(DataWidth, SrcRegNumber, DataShuffle, CacheCtrl, DescStr) \
+  template <> \
+  struct RawSendStore<DataWidth, SrcRegNumber, DataShuffle, CacheCtrl> { \
+    template <typename T, typename AddressPayload> \
+    static inline void run(const AddressPayload& address, const T& target) { \
+      asm volatile ("\n"  \
+          "raw_sendg.0xF (M1, 1) V0.0/0 %0.0/64 %1.0/" str((SrcRegNumber * 64)) " 0x0:uq 0x0:uq " str(DescStr) "\n"  \
+          :: "rw"(address.getPayload()), "rw"(target));  \
+    } \
+  };
+#else
 #define EnumerateStores(DataWidth, SrcRegNumber, DataShuffle, CacheCtrl, DescStr) \
   template <> \
   struct RawSendStore<DataWidth, SrcRegNumber, DataShuffle, CacheCtrl> { \
@@ -48,9 +73,24 @@ struct RawSendStore32_32 {
           :: "rw"(address.getPayload()), "rw"(target));  \
     } \
   };
+#endif
 
 #include "list_raw_stores.list"
 
+#if defined(__SYCL_TARGET_INTEL_GPU_CRI__)
+#define EnumerateLargeStores(DataWidth, DataShuffle, CacheCtrl, DescStr) \
+  template <>\
+  struct RawSendStore32_32<DataWidth, 16, DataShuffle, CacheCtrl> {\
+    template <typename T, typename AddressPayload>\
+    static inline void run(const AddressPayload& address, const T& target){\
+        asm volatile ("\n"  \
+            "raw_sendg.0xF (M1, 1) V0.0/0 %0.0/64 %1.0/512 0x0:uq 0x0:uq " str(DescStr) "\n" \
+            "add (M1, 1) %0(0, 6)<1> %0(0, 6)<0;1,0> %2\n"\
+            "raw_sendg.0xF (M1, 1) V0.0/0 %0.0/64 %1.512/512 0x0:uq 0x0:uq " str(DescStr) "\n" \
+            :: "rw"(address.getPayload()), "rw"(target), "i"(16));  \
+    }\
+  };
+#else
 #define EnumerateLargeStores(DataWidth, DataShuffle, CacheCtrl, DescStr) \
   template <>\
   struct RawSendStore32_32<DataWidth, 16, DataShuffle, CacheCtrl> {\
@@ -63,7 +103,25 @@ struct RawSendStore32_32 {
             :: "rw"(address.getPayload()), "rw"(target), "i"(16));  \
     }\
   };
+#endif
 
+#if defined(__SYCL_TARGET_INTEL_GPU_CRI__)
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::DEFAULT, 0x8807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1UC_L2UC_L3UC, 0x28807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1UC_L2UC_L3WB, 0x38807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1UC_L2WB_L3UC, 0x48807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1UC_L2WB_L3WB, 0x58807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1WT_L2UC_L3UC, 0x68807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1WT_L2UC_L3WB, 0x78807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1WT_L2WB_L3UC, 0x88807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1WT_L2WB_L3WB, 0x98807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1S_L2UC_L3UC, 0xa8807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1S_L2UC_L3WB, 0xb8807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1S_L2WB_L3UC, 0xc8807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1WB_L2UC_L3UC, 0xd8807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1WB_L2WB_L3UC, 0xe8807);
+EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1WB_L2UC_L3WB, 0xf8807);
+#else
 EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::DEFAULT, 0x2800207);
 EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1UC_L3UC, 0x2820207);
 EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1UC_L3WB, 0x2840207);
@@ -72,6 +130,7 @@ EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1WT_L3WB, 0x2880207);
 EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1S_L3UC, 0x28a0207);
 EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1S_L3WB, 0x28c0207);
 EnumerateLargeStores(1, DataShuffle::none, CacheCtrl::L1WB_L3WB, 0x28e0207);
+#endif
 #endif
 
 template <int DataWidth, int VectorSize, int SubGroupSize, CacheCtrl = CacheCtrl::DEFAULT>
@@ -125,6 +184,18 @@ struct LscPrefetch {
 
 #if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
 
+#if defined(__SYCL_TARGET_INTEL_GPU_CRI__)
+#define EnumeratePrefetch(DataWidth, DestRegNumber, DataShuffle, CacheCtrl, DescStr) \
+  template <> \
+  struct RawPrefetch<DataWidth, DestRegNumber, DataShuffle, CacheCtrl> {  \
+    template <typename AddressPayload> \
+    static inline void run(const AddressPayload& address) { \
+      asm volatile ("\n"  \
+          "raw_sendg.0xF (M1, 1) V0.0/0 %0.0/64 V0.0/0 0x0:uq 0x0:uq " str(DescStr) "\n"  \
+        : : "rw"(address.getPayload()));  \
+    } \
+  };
+#else
 #define EnumeratePrefetch(DataWidth, DestRegNumber, DataShuffle, CacheCtrl, DescStr) \
   template <> \
   struct RawPrefetch<DataWidth, DestRegNumber, DataShuffle, CacheCtrl> {  \
@@ -135,6 +206,7 @@ struct LscPrefetch {
         : : "rw"(address.getPayload()));  \
     } \
   };
+#endif
 
 
 #include "list_raw_prefetches.list"

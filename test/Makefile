@@ -85,6 +85,7 @@ test_execs=good_2d_load_store lsc_uncache_32_and_16 test_2dblock_matrix \
 					 unit_dpas_addresspayloads barrier_test lsc_2d_1024_load_store test_2d_accum_visa \
 					 test_packRegPayload broken_2d_load_store lsc_64to32x2_notrans test_2dblock_fp16 \
 					 test_packRegPayloadClass unit_test early_bailout
+cri_test_execs=test_cri_cache_ctrl
 
 good_2d_load_store : good_2d_load_store.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
@@ -104,10 +105,13 @@ unit_dpas_addresspayloads : unit_dpas_addresspayloads.o ../sycl_misc.o
 unit_test : unit_test.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
+test_cri_cache_ctrl : test_cri_cache_ctrl.cpp
+	$(CXX) $(CXXFLAGS) $(V) -fsycl -fsycl-targets=intel_gpu_cri -o$@ $<
+
 test_dump_state : test_dump_state.o ../sycl_misc.o
 	$(CXX) $(V) $(LINKFLAGS) -o$@ $^
 
 all : $(test_execs)
 
 clean :
-	rm -f $(test_execs) *.o *.header.hpp *.footer.hpp *.bc onepass ./tmp/*
+	rm -f $(test_execs) $(cri_test_execs) *.o *.header.hpp *.footer.hpp *.bc onepass ./tmp/*
